@@ -18,7 +18,7 @@ const steps: Step[] = [
     question: "Где ищете недвижимость?",
     options: [
       ...cities.map((c) => ({
-        value: `${c.name} (${c.country})`,
+        value: c.country ? `${c.name} (${c.country})` : c.name,
         label: `${c.countryFlag} ${c.name}`,
         hint: c.country,
       })),
@@ -225,7 +225,7 @@ export default function Quiz() {
                 </h3>
                 <p className="mt-2 text-sm text-muted">
                   Менеджер подготовит варианты под ваши ответы и свяжется с вами —
-                  обычно в течение 15 минут в рабочее время.
+                  обычно в течение 15 минут, круглосуточно.
                 </p>
                 <form onSubmit={submit} className="mt-6 space-y-3">
                   <input

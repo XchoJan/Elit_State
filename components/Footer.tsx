@@ -14,7 +14,7 @@ export default function Footer() {
           </div>
           <p className="mt-4 text-sm leading-relaxed text-white/70">
             Международное агентство недвижимости. Помогаем купить квартиру, дом
-            или инвестиционный объект в Дубае, Ереване, Тбилиси и Краснодаре.
+            или инвестиционный объект в Дубае, Ереване, Грузии и России.
           </p>
         </div>
 
@@ -29,7 +29,7 @@ export default function Footer() {
                   href="/#cities"
                   className="text-sm text-white/80 transition-colors hover:text-accent"
                 >
-                  {c.name}, {c.country}
+                  {c.country ? `${c.name}, ${c.country}` : c.name}
                 </Link>
               </li>
             ))}
@@ -69,7 +69,7 @@ export default function Footer() {
           >
             {CONTACT_PHONE}
           </a>
-          <p className="mt-1 text-sm text-white/60">Ежедневно с 9:00 до 21:00</p>
+          <p className="mt-1 text-sm text-white/60">24/7 — бесплатная консультация</p>
           <div className="mt-4 flex flex-wrap gap-2.5">
             <a
               href={WHATSAPP_HREF}

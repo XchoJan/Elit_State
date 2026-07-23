@@ -46,7 +46,7 @@ export default function Hero() {
           variants={item}
           className="rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-white backdrop-blur-sm"
         >
-          Дубай · Ереван · Тбилиси · Краснодар
+          Дубай · Ереван · Грузия · Россия
         </motion.p>
         <motion.h1
           variants={item}
@@ -89,7 +89,7 @@ export default function Hero() {
             >
               <span className="text-2xl">{c.countryFlag}</span>
               <p className="mt-1.5 text-sm font-semibold">{c.name}</p>
-              <p className="text-xs text-white/70">{c.country}</p>
+              {c.country && <p className="text-xs text-white/70">{c.country}</p>}
             </a>
           ))}
         </motion.div>

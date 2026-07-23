@@ -6,7 +6,7 @@ import { CONTACT_PHONE, CONTACT_PHONE_HREF, INSTAGRAM_HREF, WHATSAPP_HREF } from
 export const metadata: Metadata = {
   title: "Контакты",
   description:
-    "Свяжитесь с Elit Estate: телефон +374 91 446615, WhatsApp, форма заявки. Работаем ежедневно с 9:00 до 21:00.",
+    "Свяжитесь с Elit Estate: телефон +374 91 446615, WhatsApp, форма заявки. Работаем 24/7 — бесплатная консультация.",
 };
 
 export default function ContactsPage() {
@@ -22,7 +22,7 @@ export default function ContactsPage() {
           </h1>
           <p className="mt-3 max-w-2xl leading-relaxed text-muted">
             Позвоните, напишите в WhatsApp или оставьте заявку — менеджер ответит
-            в течение 15 минут в рабочее время.
+            в течение 15 минут, круглосуточно.
           </p>
         </Reveal>
 
@@ -37,7 +37,7 @@ export default function ContactsPage() {
                   Телефон
                 </p>
                 <p className="mt-2 text-2xl font-bold text-brand">{CONTACT_PHONE}</p>
-                <p className="mt-1 text-sm text-muted">Ежедневно с 9:00 до 21:00 (GMT+4)</p>
+                <p className="mt-1 text-sm text-muted">24/7 — бесплатная консультация</p>
               </a>
             </RevealItem>
 
@@ -68,7 +68,7 @@ export default function ContactsPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted">
                   Instagram
                 </p>
-                <p className="mt-2 text-2xl font-bold text-brand">@dubaiown</p>
+                <p className="mt-2 text-2xl font-bold text-brand">@elit_state</p>
                 <p className="mt-1 text-sm text-muted">
                   Свежие объекты и обзоры районов — подписывайтесь
                 </p>
@@ -83,8 +83,8 @@ export default function ContactsPage() {
                 <ul className="mt-3 space-y-2 text-sm text-foreground/80">
                   <li>🇦🇲 Ереван — центральный офис</li>
                   <li>🇦🇪 Дубай — партнёрский офис</li>
-                  <li>🇬🇪 Тбилиси — партнёрский офис</li>
-                  <li>🇷🇺 Краснодар — партнёрский офис</li>
+                  <li>🇬🇪 Грузия — партнёрский офис</li>
+                  <li>🇷🇺 Россия — партнёрский офис</li>
                 </ul>
               </div>
             </RevealItem>

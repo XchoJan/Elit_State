@@ -8,7 +8,7 @@ import { cities, CONTACT_PHONE, CONTACT_PHONE_HREF } from "@/lib/data";
 export const metadata: Metadata = {
   title: "О нас",
   description:
-    "Elit Estate — международное агентство недвижимости. Подбираем и сопровождаем покупку квартир и домов в Дубае, Ереване, Тбилиси и Краснодаре.",
+    "Elit Estate — международное агентство недвижимости. Подбираем и сопровождаем покупку квартир и домов в Дубае, Ереване, Грузии и России.",
 };
 
 const values = [
@@ -46,7 +46,7 @@ export default function AboutPage() {
           </h1>
           <p className="mt-5 max-w-2xl leading-relaxed text-white/80">
             Elit Estate — международное агентство недвижимости. Мы объединили
-            рынки Дубая, Еревана, Тбилиси и Краснодара в одном окне: сравниваем
+            рынки Дубая, Еревана, Грузии и России в одном окне: сравниваем
             цены и доходность, подбираем объект под цели клиента и проводим
             сделку под ключ — в том числе полностью дистанционно.
           </p>
@@ -80,7 +80,7 @@ export default function AboutPage() {
             </p>
             <p className="mt-4 leading-relaxed text-foreground/80">
               Мы не «продаём квадратные метры» — мы решаем задачу клиента.
-              Иногда правильный ответ — не Дубай, а Тбилиси; не студия под
+              Иногда правильный ответ — не Дубай, а Грузия; не студия под
               аренду, а дом для семьи. Поэтому первый шаг любой сделки у нас —
               разговор о целях, а не показ каталога.
             </p>
@@ -123,9 +123,11 @@ export default function AboutPage() {
                   <h3 className="mt-3 text-lg font-bold text-brand group-hover:text-accent">
                     {c.name}
                   </h3>
-                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-muted">
-                    {c.country}
-                  </p>
+                  {c.country && (
+                    <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-muted">
+                      {c.country}
+                    </p>
+                  )}
                   <p className="mt-3 text-sm leading-relaxed text-muted">{c.description}</p>
                 </Link>
               </RevealItem>

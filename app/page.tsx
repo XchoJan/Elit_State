@@ -12,7 +12,7 @@ import {
 } from "@/lib/data";
 
 const promises = [
-  { value: "4 страны", label: "Дубай, Ереван, Тбилиси и Краснодар — в одном окне" },
+  { value: "4 страны", label: "Дубай, Ереван, Грузия и Россия — в одном окне" },
   { value: "0%", label: "Комиссия для покупателя — цены как у застройщика" },
   { value: "24 часа", label: "И персональная подборка объектов у вас в WhatsApp" },
   { value: "Дистанционно", label: "Онлайн-показы и сделки без вылета" },
@@ -142,7 +142,7 @@ export default function Home() {
                   <div>
                     <h3 className="font-display text-2xl font-bold text-brand">{c.name}</h3>
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                      {c.country} · {c.tagline}
+                      {c.country ? `${c.country} · ${c.tagline}` : c.tagline}
                     </p>
                   </div>
                 </div>
