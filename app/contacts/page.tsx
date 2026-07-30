@@ -68,7 +68,7 @@ export default function ContactsPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted">
                   Instagram
                 </p>
-                <p className="mt-2 text-2xl font-bold text-brand">@elit_state</p>
+                <p className="mt-2 text-2xl font-bold text-brand">@eliteestate_am</p>
                 <p className="mt-1 text-sm text-muted">
                   Свежие объекты и обзоры районов — подписывайтесь
                 </p>
