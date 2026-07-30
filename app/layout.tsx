@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import MotionProvider from "@/components/MotionProvider";
 import ScrollProgress from "@/components/ScrollProgress";
+import YandexMetrika from "@/components/YandexMetrika";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -57,6 +58,7 @@ export default function RootLayout({
           {children}
           <Footer />
         </MotionProvider>
+        <YandexMetrika />
       </body>
     </html>
   );

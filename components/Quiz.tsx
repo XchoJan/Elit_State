@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useState } from "react";
 import { cities, CONTACT_PHONE } from "@/lib/data";
+import { GOALS, reachGoal } from "@/lib/analytics";
 
 const EASE: [number, number, number, number] = [0.21, 0.47, 0.32, 0.98];
 
@@ -57,6 +58,14 @@ const steps: Step[] = [
   },
 ];
 
+// Цель Метрики для каждого шага — чтобы видеть, где именно отваливаются.
+const STEP_GOALS = [
+  GOALS.quizStart,
+  GOALS.quizGoal,
+  GOALS.quizBudget,
+  GOALS.quizRooms,
+];
+
 const slideVariants: Variants = {
   enter: (dir: number) => ({ opacity: 0, x: dir >= 0 ? 32 : -32 }),
   center: { opacity: 1, x: 0 },
@@ -84,6 +93,9 @@ export default function Quiz() {
 
   function pick(key: string, value: string) {
     setAnswers((a) => ({ ...a, [key]: value }));
+    reachGoal(STEP_GOALS[stepIdx], { [key]: value });
+    // Дошёл до формы контактов — самый важный шаг перед заявкой.
+    if (stepIdx + 1 === steps.length) reachGoal(GOALS.quizContacts);
     setDirection(1);
     setStepIdx((i) => i + 1);
   }
@@ -115,6 +127,12 @@ export default function Quiz() {
         }),
       });
       if (!res.ok) throw new Error();
+      reachGoal(GOALS.quizSubmit, {
+        city: answers.city,
+        goal: answers.goal,
+        budget: answers.budget,
+        rooms: answers.rooms,
+      });
       setStatus("done");
     } catch {
       setStatus("error");

@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { useState } from "react";
+import { GOALS, reachGoal } from "@/lib/analytics";
 
 export default function LeadForm({
   subject,
@@ -24,6 +25,7 @@ export default function LeadForm({
         body: JSON.stringify({ ...data, subject: subject ?? "Общая заявка" }),
       });
       if (!res.ok) throw new Error();
+      reachGoal(GOALS.leadFormSubmit, { subject: subject ?? "Общая заявка" });
       setStatus("done");
       form.reset();
     } catch {
