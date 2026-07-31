@@ -43,3 +43,6 @@ next-env.d.ts
 
 # заявки с формы (персональные данные)
 /data/leads.json
+
+# скрипты деплоя (содержат credentials)
+/bash_scripts
