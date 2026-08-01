@@ -26,6 +26,8 @@ export const GOALS = {
   quizGoal: "quiz_step_goal", // ответил на «для чего покупаете»
   quizBudget: "quiz_step_budget", // ответил на «бюджет»
   quizRooms: "quiz_step_rooms", // ответил на «комнаты»
+  quizPayment: "quiz_step_payment", // ответил на «способ оплаты»
+  quizTiming: "quiz_step_timing", // ответил на «срок покупки»
   quizContacts: "quiz_contacts", // дошёл до формы контактов
   quizSubmit: "quiz_submit", // отправил заявку из квиза ✅
   leadFormSubmit: "lead_form_submit", // отправил обычную форму ✅
@@ -50,6 +52,8 @@ const META_CUSTOM_EVENTS: Record<string, string> = {
   [GOALS.quizGoal]: "QuizStepGoal",
   [GOALS.quizBudget]: "QuizStepBudget",
   [GOALS.quizRooms]: "QuizStepRooms",
+  [GOALS.quizPayment]: "QuizStepPayment",
+  [GOALS.quizTiming]: "QuizStepTiming",
   [GOALS.quizContacts]: "QuizReachedContacts",
   [GOALS.instagramClick]: "InstagramClick",
 };

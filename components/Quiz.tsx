@@ -1,62 +1,171 @@
 "use client";
 
 import { AnimatePresence, motion, type Variants } from "motion/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cities, CONTACT_PHONE } from "@/lib/data";
 import { GOALS, reachGoal } from "@/lib/analytics";
 
 const EASE: [number, number, number, number] = [0.21, 0.47, 0.32, 0.98];
 
+interface Option {
+  value: string;
+  label: string;
+  hint?: string;
+  /** Только у вариантов первого шага — по нему подбираются шкалы дальше. */
+  slug?: string;
+}
+
 interface Step {
   key: string;
   question: string;
-  options: { value: string; label: string; hint?: string }[];
+  subtitle?: string;
+  options: Option[];
 }
 
-const steps: Step[] = [
-  {
-    key: "city",
-    question: "Где ищете недвижимость?",
-    options: [
-      ...cities.map((c) => ({
-        value: c.country ? `${c.name} (${c.country})` : c.name,
-        label: `${c.countryFlag} ${c.name}`,
-        hint: c.country,
-      })),
-      { value: "Не определился", label: "🤔 Ещё выбираю", hint: "поможем сравнить" },
-    ],
-  },
-  {
-    key: "goal",
-    question: "Для чего покупаете?",
-    options: [
-      { value: "Для жизни", label: "🏠 Для себя и семьи" },
-      { value: "Инвестиции / аренда", label: "📈 Инвестиции и аренда" },
-      { value: "Переезд / ВНЖ", label: "✈️ Переезд или ВНЖ" },
-      { value: "Отдых у моря", label: "🌊 Дом для отдыха" },
-    ],
-  },
-  {
-    key: "budget",
-    question: "Какой бюджет рассматриваете?",
-    options: [
-      { value: "до $100 000", label: "До $100 000" },
-      { value: "$100 000 – $300 000", label: "$100 000 – $300 000" },
-      { value: "$300 000 – $700 000", label: "$300 000 – $700 000" },
-      { value: "от $700 000", label: "От $700 000" },
-    ],
-  },
-  {
-    key: "rooms",
-    question: "Сколько комнат нужно?",
-    options: [
-      { value: "Студия", label: "Студия" },
-      { value: "1–2 комнаты", label: "1–2 комнаты" },
-      { value: "3 и больше", label: "3 и больше" },
-      { value: "Дом / вилла", label: "Дом или вилла" },
-    ],
-  },
-];
+const UNDECIDED: Option = {
+  value: "Пока не определился",
+  label: "Пока не определился",
+  hint: "подскажем ориентиры",
+};
+
+// Порог входа сильно разный по странам: в Дубае почти нет предложений
+// дешевле $300 000, а в России считать удобнее в рублях. Поэтому шкала
+// бюджета своя для каждого направления.
+const BUDGET_OPTIONS: Record<string, Option[]> = {
+  dubai: [
+    { value: "$300 000 – $500 000", label: "$300 000 – $500 000", hint: "студии и 1 спальня" },
+    { value: "$500 000 – $800 000", label: "$500 000 – $800 000", hint: "2–3 спальни" },
+    { value: "$800 000 – $1 500 000", label: "$800 000 – $1 500 000", hint: "премиальные районы" },
+    { value: "от $1 500 000", label: "От $1 500 000", hint: "виллы и пентхаусы" },
+    UNDECIDED,
+  ],
+  yerevan: [
+    { value: "до $100 000", label: "До $100 000", hint: "студии и 1–2 комнаты" },
+    { value: "$100 000 – $200 000", label: "$100 000 – $200 000", hint: "новостройки в центре" },
+    { value: "$200 000 – $300 000", label: "$200 000 – $300 000", hint: "просторные квартиры" },
+    { value: "от $300 000", label: "От $300 000", hint: "дома и пентхаусы" },
+    UNDECIDED,
+  ],
+  tbilisi: [
+    { value: "до $100 000", label: "До $100 000", hint: "новостройки Тбилиси и Батуми" },
+    { value: "$100 000 – $200 000", label: "$100 000 – $200 000", hint: "видовые квартиры" },
+    { value: "$200 000 – $300 000", label: "$200 000 – $300 000", hint: "премиум-комплексы" },
+    { value: "от $300 000", label: "От $300 000", hint: "дома и пентхаусы" },
+    UNDECIDED,
+  ],
+  krasnodar: [
+    { value: "до 5 млн ₽", label: "До 5 млн ₽", hint: "студии и 1-комнатные" },
+    { value: "5–10 млн ₽", label: "5–10 млн ₽", hint: "комфорт-класс" },
+    { value: "10–20 млн ₽", label: "10–20 млн ₽", hint: "бизнес-класс" },
+    { value: "от 20 млн ₽", label: "От 20 млн ₽", hint: "премиум и дома" },
+    UNDECIDED,
+  ],
+  default: [
+    { value: "до $100 000", label: "До $100 000" },
+    { value: "$100 000 – $200 000", label: "$100 000 – $200 000" },
+    { value: "$200 000 – $300 000", label: "$200 000 – $300 000" },
+    { value: "от $300 000", label: "От $300 000" },
+    UNDECIDED,
+  ],
+};
+
+// Доступные схемы оплаты тоже завязаны на страну: беспроцентная рассрочка —
+// фишка Дубая, семейная ипотека — России.
+const PAYMENT_OPTIONS: Record<string, Option[]> = {
+  dubai: [
+    { value: "Полная оплата", label: "💵 Полная оплата" },
+    {
+      value: "Рассрочка от застройщика",
+      label: "📄 Рассрочка от застройщика",
+      hint: "часто без процентов",
+    },
+    { value: "Ипотека в банке ОАЭ", label: "🏦 Ипотека в банке ОАЭ" },
+    { value: "Ещё не решил", label: "🤔 Ещё не решил", hint: "разберём варианты" },
+  ],
+  krasnodar: [
+    { value: "Полная оплата", label: "💵 Полная оплата" },
+    { value: "Ипотека", label: "🏦 Ипотека", hint: "в том числе семейная" },
+    { value: "Рассрочка от застройщика", label: "📄 Рассрочка от застройщика" },
+    { value: "Ещё не решил", label: "🤔 Ещё не решил", hint: "разберём варианты" },
+  ],
+  default: [
+    { value: "Полная оплата", label: "💵 Полная оплата" },
+    { value: "Рассрочка от застройщика", label: "📄 Рассрочка от застройщика" },
+    { value: "Ипотека / кредит", label: "🏦 Ипотека или кредит" },
+    { value: "Ещё не решил", label: "🤔 Ещё не решил", hint: "разберём варианты" },
+  ],
+};
+
+const CITY_STEP: Step = {
+  key: "city",
+  question: "Где ищете недвижимость?",
+  options: [
+    ...cities.map((c) => ({
+      value: c.country ? `${c.name} (${c.country})` : c.name,
+      label: `${c.countryFlag} ${c.name}`,
+      hint: c.country,
+      slug: c.slug,
+    })),
+    {
+      value: "Не определился",
+      label: "🤔 Ещё выбираю",
+      hint: "поможем сравнить",
+      slug: "default",
+    },
+  ],
+};
+
+function buildSteps(citySlug: string): Step[] {
+  return [
+    CITY_STEP,
+    {
+      key: "goal",
+      question: "Для чего покупаете?",
+      options: [
+        { value: "Для жизни", label: "🏠 Для себя и семьи" },
+        { value: "Инвестиции / аренда", label: "📈 Инвестиции и аренда" },
+        { value: "Переезд / ВНЖ", label: "✈️ Переезд или ВНЖ" },
+        { value: "Отдых у моря", label: "🌊 Дом для отдыха" },
+      ],
+    },
+    {
+      key: "budget",
+      question: "Какой бюджет рассматриваете?",
+      subtitle: "Ориентир по этому направлению — точные цены зависят от объекта",
+      options: BUDGET_OPTIONS[citySlug] ?? BUDGET_OPTIONS.default,
+    },
+    {
+      key: "rooms",
+      question: "Сколько комнат нужно?",
+      options: [
+        { value: "Студия", label: "Студия" },
+        { value: "1–2 комнаты", label: "1–2 комнаты" },
+        { value: "3 и больше", label: "3 и больше" },
+        { value: "Дом / вилла", label: "Дом или вилла" },
+      ],
+    },
+    {
+      key: "payment",
+      question: "Как планируете оплачивать?",
+      subtitle: "Подберём объекты под подходящие условия",
+      options: PAYMENT_OPTIONS[citySlug] ?? PAYMENT_OPTIONS.default,
+    },
+    {
+      key: "timing",
+      question: "Когда планируете покупку?",
+      options: [
+        {
+          value: "В ближайший месяц",
+          label: "🔥 В ближайший месяц",
+          hint: "готов смотреть объекты",
+        },
+        { value: "1–3 месяца", label: "📅 Через 1–3 месяца" },
+        { value: "3–6 месяцев", label: "🗓️ Через 3–6 месяцев" },
+        { value: "Изучаю рынок", label: "🔍 Пока изучаю рынок", hint: "без конкретных сроков" },
+      ],
+    },
+  ];
+}
 
 // Цель Метрики для каждого шага — чтобы видеть, где именно отваливаются.
 const STEP_GOALS = [
@@ -64,6 +173,8 @@ const STEP_GOALS = [
   GOALS.quizGoal,
   GOALS.quizBudget,
   GOALS.quizRooms,
+  GOALS.quizPayment,
+  GOALS.quizTiming,
 ];
 
 const slideVariants: Variants = {
@@ -85,15 +196,34 @@ const optionItem: Variants = {
 export default function Quiz() {
   const [stepIdx, setStepIdx] = useState(0);
   const [direction, setDirection] = useState(1);
+  const [citySlug, setCitySlug] = useState("default");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
 
+  const steps = useMemo(() => buildSteps(citySlug), [citySlug]);
   const total = steps.length + 1; // + шаг с контактами
   const onContactStep = stepIdx === steps.length;
 
-  function pick(key: string, value: string) {
-    setAnswers((a) => ({ ...a, [key]: value }));
-    reachGoal(STEP_GOALS[stepIdx], { [key]: value });
+  function pick(key: string, option: Option) {
+    if (key === "city") {
+      const next = option.slug ?? "default";
+      // Сменил страну — прежние бюджет и способ оплаты могли исчезнуть из шкалы.
+      if (next !== citySlug) {
+        setAnswers((a) => {
+          const rest: Record<string, string> = { ...a, city: option.value };
+          delete rest.budget;
+          delete rest.payment;
+          return rest;
+        });
+        setCitySlug(next);
+      } else {
+        setAnswers((a) => ({ ...a, city: option.value }));
+      }
+    } else {
+      setAnswers((a) => ({ ...a, [key]: option.value }));
+    }
+
+    reachGoal(STEP_GOALS[stepIdx], { [key]: option.value });
     // Дошёл до формы контактов — самый важный шаг перед заявкой.
     if (stepIdx + 1 === steps.length) reachGoal(GOALS.quizContacts);
     setDirection(1);
@@ -123,6 +253,8 @@ export default function Quiz() {
             `Цель: ${answers.goal ?? "—"}`,
             `Бюджет: ${answers.budget ?? "—"}`,
             `Комнаты: ${answers.rooms ?? "—"}`,
+            `Оплата: ${answers.payment ?? "—"}`,
+            `Срок покупки: ${answers.timing ?? "—"}`,
           ].join("; "),
         }),
       });
@@ -132,6 +264,8 @@ export default function Quiz() {
         goal: answers.goal,
         budget: answers.budget,
         rooms: answers.rooms,
+        payment: answers.payment,
+        timing: answers.timing,
       });
       setStatus("done");
     } catch {
@@ -207,23 +341,30 @@ export default function Quiz() {
                 <h3 className="font-display mt-4 text-2xl font-bold text-brand sm:text-3xl">
                   {steps[stepIdx].question}
                 </h3>
+                {steps[stepIdx].subtitle && (
+                  <p className="mt-2 text-sm text-muted">{steps[stepIdx].subtitle}</p>
+                )}
                 <motion.div
                   className="mt-6 grid gap-3 sm:grid-cols-2"
                   variants={optionsParent}
                   initial="hidden"
                   animate="show"
                 >
-                  {steps[stepIdx].options.map((o) => (
+                  {steps[stepIdx].options.map((o, i, all) => (
                     <motion.button
                       key={o.value}
                       variants={optionItem}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => pick(steps[stepIdx].key, o.value)}
+                      onClick={() => pick(steps[stepIdx].key, o)}
                       className={`rounded-2xl border-2 px-5 py-4 text-left transition-colors hover:border-accent hover:shadow-md ${
                         answers[steps[stepIdx].key] === o.value
                           ? "border-accent bg-accent/5"
                           : "border-line bg-white"
+                      } ${
+                        // Нечётное число вариантов — последний растягиваем на всю ширину,
+                        // иначе в сетке остаётся дыра.
+                        all.length % 2 === 1 && i === all.length - 1 ? "sm:col-span-2" : ""
                       }`}
                     >
                       <span className="block text-base font-semibold text-brand">
