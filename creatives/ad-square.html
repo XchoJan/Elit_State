@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1080px;
+    height: 1080px;
+    overflow: hidden;
+    font-family: "Manrope", sans-serif;
+    background: #0f2438;
+  }
+
+  .canvas {
+    position: relative;
+    width: 1080px;
+    height: 1080px;
+    overflow: hidden;
+  }
+
+  .photo {
+    position: absolute;
+    inset: 0;
+    background-image: url("https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=1600&q=85");
+    background-size: cover;
+    background-position: 60% center;
+  }
+
+  /* Затемнение: слева плотное под текст, справа прозрачнее — видно город */
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(100deg,
+        rgba(10,26,42,0.97) 0%,
+        rgba(12,30,48,0.93) 38%,
+        rgba(13,33,52,0.72) 58%,
+        rgba(15,36,56,0.45) 100%),
+      linear-gradient(180deg,
+        rgba(10,24,38,0.55) 0%,
+        rgba(10,24,38,0) 28%,
+        rgba(8,20,32,0.6) 100%);
+  }
+
+  .glow {
+    position: absolute;
+    width: 620px;
+    height: 620px;
+    right: -180px;
+    top: -140px;
+    background: radial-gradient(circle, rgba(201,162,75,0.30) 0%, rgba(201,162,75,0) 68%);
+    filter: blur(10px);
+  }
+
+  .content {
+    position: absolute;
+    inset: 0;
+    padding: 74px 70px 68px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- Логотип ---------- */
+  .brand { display: flex; align-items: center; gap: 18px; }
+
+  .mark {
+    display: flex;
+    align-items: flex-end;
+    gap: 5px;
+    height: 46px;
+  }
+  .mark i {
+    display: block;
+    width: 11px;
+    border-radius: 2px 2px 0 0;
+    background: linear-gradient(180deg, #e3c078 0%, #c9a24b 100%);
+  }
+  .mark i:nth-child(1) { height: 27px; }
+  .mark i:nth-child(2) { height: 46px; }
+  .mark i:nth-child(3) { height: 35px; }
+
+  .brand-name {
+    font-family: "Playfair Display", serif;
+    font-weight: 700;
+    font-size: 33px;
+    letter-spacing: 0.20em;
+    color: #fff;
+    line-height: 1;
+    padding-top: 3px;
+  }
+
+  /* ---------- Заголовок ---------- */
+  .kicker {
+    margin-top: 78px;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: #d8b66a;
+  }
+  .kicker::after {
+    content: "";
+    display: block;
+    width: 62px;
+    height: 3px;
+    margin-top: 20px;
+    background: linear-gradient(90deg, #c9a24b, rgba(201,162,75,0));
+    border-radius: 2px;
+  }
+
+  h1 {
+    margin-top: 26px;
+    font-family: "Playfair Display", serif;
+    font-weight: 900;
+    font-size: 86px;
+    line-height: 1.02;
+    color: #fff;
+    letter-spacing: -0.5px;
+    text-shadow: 0 4px 30px rgba(0,0,0,0.45);
+  }
+  h1 span { color: #d8b66a; display: block; }
+
+  .lead {
+    margin-top: 26px;
+    font-size: 27px;
+    font-weight: 500;
+    line-height: 1.45;
+    color: rgba(255,255,255,0.88);
+    max-width: 620px;
+  }
+
+  /* ---------- Страны ---------- */
+  .countries {
+    margin-top: 34px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .country {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 11px 20px 11px 15px;
+    border: 1px solid rgba(216,182,106,0.42);
+    background: rgba(255,255,255,0.07);
+    border-radius: 999px;
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .country b { font-size: 25px; line-height: 1; }
+
+  /* ---------- Преимущества ---------- */
+  .points {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 19px;
+  }
+  .point {
+    display: flex;
+    align-items: center;
+    gap: 17px;
+    font-size: 26px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.95);
+  }
+  .tick {
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(201,162,75,0.20);
+    border: 1.5px solid rgba(216,182,106,0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .tick svg { width: 19px; height: 19px; }
+
+  /* ---------- Плашка CTA ---------- */
+  .cta {
+    margin-top: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 27px 36px;
+    border-radius: 20px;
+    background: linear-gradient(100deg, #d8b66a 0%, #c9a24b 55%, #b4913f 100%);
+    box-shadow: 0 18px 44px rgba(0,0,0,0.35);
+  }
+  .cta-main {
+    font-size: 31px;
+    font-weight: 800;
+    color: #17293d;
+    line-height: 1.15;
+    letter-spacing: -0.2px;
+  }
+  .cta-sub {
+    margin-top: 5px;
+    font-size: 19px;
+    font-weight: 600;
+    color: rgba(23,41,61,0.72);
+  }
+  .cta-arrow {
+    flex: none;
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    background: #17293d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .cta-arrow svg { width: 27px; height: 27px; }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="photo"></div>
+    <div class="scrim"></div>
+    <div class="glow"></div>
+
+    <div class="content">
+      <div class="brand">
+        <div class="mark"><i></i><i></i><i></i></div>
+        <div class="brand-name">ELITE ESTATE</div>
+      </div>
+
+      <div class="kicker">Международное агентство недвижимости</div>
+
+      <h1>Найдём квартиру<span>под вашу задачу</span></h1>
+
+      <div class="lead">Для жизни, переезда или сдачи в аренду — подберём и сопроводим сделку до получения ключей.</div>
+
+      <div class="countries">
+        <div class="country"><b>🇦🇪</b> Дубай</div>
+        <div class="country"><b>🇦🇲</b> Ереван</div>
+        <div class="country"><b>🇬🇪</b> Грузия</div>
+        <div class="country"><b>🇷🇺</b> Россия</div>
+      </div>
+
+      <div class="points">
+        <div class="point">
+          <span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="#e3c078" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.2 5.2L20 6.9"/></svg></span>
+          Работаем напрямую с застройщиками
+        </div>
+        <div class="point">
+          <span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="#e3c078" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.2 5.2L20 6.9"/></svg></span>
+          Подбор под ваш бюджет и задачу
+        </div>
+        <div class="point">
+          <span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="#e3c078" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.2 5.2L20 6.9"/></svg></span>
+          Полное сопровождение сделки
+        </div>
+      </div>
+
+      <div class="cta">
+        <div>
+          <div class="cta-main">Бесплатная подборка за 24 часа</div>
+          <div class="cta-sub">Напишите в Direct — пришлём варианты</div>
+        </div>
+        <div class="cta-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#e3c078" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7 7-7 7"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

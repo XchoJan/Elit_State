@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import MotionProvider from "@/components/MotionProvider";
 import ScrollProgress from "@/components/ScrollProgress";
 import YandexMetrika from "@/components/YandexMetrika";
+import MetaPixel from "@/components/MetaPixel";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -59,6 +60,7 @@ export default function RootLayout({
           <Footer />
         </MotionProvider>
         <YandexMetrika />
+        <MetaPixel />
       </body>
     </html>
   );
