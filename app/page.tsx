@@ -182,7 +182,7 @@ export default function Home() {
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
         <Reveal className="text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-            Почему Elit Estate
+            Почему Elite Estate
           </p>
           <h2 className="font-display mt-2 text-3xl font-bold text-brand sm:text-4xl">
             Покупка недвижимости — это просто

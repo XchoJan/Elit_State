@@ -35,7 +35,7 @@ export default function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex items-baseline gap-1.5" onClick={() => setOpen(false)}>
           <span className="font-display text-2xl font-bold tracking-tight text-brand">
-            Elit
+            Elite
           </span>
           <span className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
             Estate

@@ -97,5 +97,5 @@ export const CONTACT_PHONE = "+374 91 446615";
 export const CONTACT_PHONE_HREF = "tel:+37491446615";
 export const WHATSAPP_HREF =
   "https://wa.me/37491446615?text=" +
-  encodeURIComponent("Здравствуйте! Хочу подобрать недвижимость. Пишу с сайта Elit Estate.");
+  encodeURIComponent("Здравствуйте! Хочу подобрать недвижимость. Пишу с сайта Elite Estate.");
 export const INSTAGRAM_HREF = "https://www.instagram.com/eliteestate_am/";

@@ -6,7 +6,7 @@ import { CONTACT_PHONE, CONTACT_PHONE_HREF, INSTAGRAM_HREF, WHATSAPP_HREF } from
 export const metadata: Metadata = {
   title: "Контакты",
   description:
-    "Свяжитесь с Elit Estate: телефон +374 91 446615, WhatsApp, форма заявки. Работаем 24/7 — бесплатная консультация.",
+    "Свяжитесь с Elite Estate: телефон +374 91 446615, WhatsApp, форма заявки. Работаем 24/7 — бесплатная консультация.",
 };
 
 export default function ContactsPage() {

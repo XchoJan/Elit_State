@@ -7,7 +7,7 @@ export default function Footer() {
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-4">
         <div>
           <div className="flex items-baseline gap-1.5">
-            <span className="font-display text-2xl font-bold">Elit</span>
+            <span className="font-display text-2xl font-bold">Elite</span>
             <span className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
               Estate
             </span>
@@ -98,7 +98,7 @@ export default function Footer() {
       </div>
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 text-xs text-white/50 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <span>© {new Date().getFullYear()} Elit Estate. Все права защищены.</span>
+          <span>© {new Date().getFullYear()} Elite Estate. Все права защищены.</span>
           <span>
             Рыночные ориентиры на сайте — по открытым данным; условия конкретных
             объектов уточняйте у менеджера.

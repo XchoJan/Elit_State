@@ -8,7 +8,7 @@ import { cities, CONTACT_PHONE, CONTACT_PHONE_HREF } from "@/lib/data";
 export const metadata: Metadata = {
   title: "О нас",
   description:
-    "Elit Estate — международное агентство недвижимости. Подбираем и сопровождаем покупку квартир и домов в Дубае, Ереване, Грузии и России.",
+    "Elite Estate — международное агентство недвижимости. Подбираем и сопровождаем покупку квартир и домов в Дубае, Ереване, Грузии и России.",
 };
 
 const values = [
@@ -45,7 +45,7 @@ export default function AboutPage() {
             Помогаем находить дома мечты в четырёх странах
           </h1>
           <p className="mt-5 max-w-2xl leading-relaxed text-white/80">
-            Elit Estate — международное агентство недвижимости. Мы объединили
+            Elite Estate — международное агентство недвижимости. Мы объединили
             рынки Дубая, Еревана, Грузии и России в одном окне: сравниваем
             цены и доходность, подбираем объект под цели клиента и проводим
             сделку под ключ — в том числе полностью дистанционно.
@@ -96,7 +96,7 @@ export default function AboutPage() {
           <Reveal delay={0.15} className="relative aspect-[3/4] overflow-hidden rounded-3xl">
             <Image
               src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1200&q=80"
-              alt="Команда Elit Estate"
+              alt="Команда Elite Estate"
               fill
               sizes="(max-width: 1024px) 100vw, 50vw"
               className="object-cover"

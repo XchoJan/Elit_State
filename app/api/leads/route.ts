@@ -23,7 +23,7 @@ async function sendToTelegram(lead: Lead) {
   if (!token || !chatId) return;
 
   const lines = [
-    "🏠 <b>Новая заявка — Elit Estate</b>",
+    "🏠 <b>Новая заявка — Elite Estate</b>",
     lead.subject ? `Источник: ${escapeHtml(lead.subject)}` : undefined,
     `Имя: ${escapeHtml(lead.name)}`,
     `Телефон: ${escapeHtml(lead.phone)}`,
