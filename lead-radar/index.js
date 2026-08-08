@@ -57,6 +57,14 @@ if (!botToken || !chatId) {
 const STATS_INTERVAL_MIN = Number(process.env.STATS_INTERVAL_MIN ?? 30);
 const stats = { seen: 0, matched: 0 };
 
+// Сколько интервалов подряд без единого сообщения считать поломкой.
+// Ровно эта ситуация уже случалась: процесс «online», а сообщений не видит.
+// Молчание радара неотличимо от затишья в чатах, поэтому он должен
+// сам сказать, что ослеп, — иначе вы неделю ждёте лидов от мёртвого инструмента.
+const SILENT_INTERVALS_TO_ALARM = 3;
+let silentIntervals = 0;
+let alarmSent = false;
+
 const alertTimestamps = [];
 
 function rateLimited() {
@@ -194,11 +202,31 @@ const dialogs = await client.getDialogs({ limit: 200 });
 const chatCount = dialogs.filter((d) => d.isGroup || d.isChannel).length;
 console.log(`Чатов и каналов у аккаунта: ${chatCount}`);
 
-setInterval(() => {
+setInterval(async () => {
   console.log(
     `[${new Date().toLocaleTimeString()}] за ${STATS_INTERVAL_MIN} мин: ` +
       `просмотрено ${stats.seen}, совпало ${stats.matched}`
   );
+
+  if (stats.seen === 0) {
+    silentIntervals++;
+    if (silentIntervals >= SILENT_INTERVALS_TO_ALARM && !alarmSent) {
+      alarmSent = true;
+      await notify(
+        `🔴 <b>Радар не видит сообщений</b>\n` +
+          `Уже ${silentIntervals * STATS_INTERVAL_MIN} минут подряд — ни одного сообщения ` +
+          `из ${chatCount} чатов.\n\nЛибо чаты действительно молчат, либо радар ослеп. ` +
+          `Проверьте: <code>pm2 restart lead-radar</code>`
+      );
+    }
+  } else {
+    if (alarmSent) {
+      await notify("🟢 Радар снова видит сообщения — поток восстановился.");
+    }
+    silentIntervals = 0;
+    alarmSent = false;
+  }
+
   stats.seen = 0;
   stats.matched = 0;
 }, STATS_INTERVAL_MIN * 60_000);
