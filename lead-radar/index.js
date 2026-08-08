@@ -109,6 +109,21 @@ function messageLink(chat, message) {
   return null;
 }
 
+/**
+ * Автор сообщения. В разных версиях библиотеки метод живёт то на событии,
+ * то на самом сообщении, а отсутствующий метод даёт синхронный TypeError —
+ * его не поймает .catch(). Поэтому проверяем наличие метода до вызова.
+ */
+async function resolveSender(event, message) {
+  try {
+    if (typeof message?.getSender === "function") return await message.getSender();
+    if (typeof event?.getSender === "function") return await event.getSender();
+  } catch {
+    // не удалось — уведомление уйдёт без имени автора, это не повод его терять
+  }
+  return null;
+}
+
 function senderLabel(sender) {
   if (!sender) return "неизвестно";
   const name = [sender.firstName, sender.lastName].filter(Boolean).join(" ");
@@ -138,7 +153,9 @@ client.addEventHandler(async (event) => {
     // в кэше сущностей. Раньше на этом месте стоял ранний выход — и радар
     // молча выбрасывал ВСЕ сообщения. Нераспознанное название чата не повод
     // терять клиента: без него просто не сработает гео из заголовка.
-    const chat = await event.getChat().catch(() => null);
+    const chat = await (typeof event.getChat === "function"
+      ? event.getChat().catch(() => null)
+      : Promise.resolve(null));
     const chatTitle = chat?.title ?? "";
 
     // Личные переписки пропускаем: там и так видно, что пишут.
@@ -152,7 +169,7 @@ client.addEventHandler(async (event) => {
 
     stats.matched++;
 
-    const sender = await event.getSender().catch(() => null);
+    const sender = await resolveSender(event, message);
     if (sender?.bot) return;
 
     if (rateLimited()) {
