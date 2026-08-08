@@ -12,9 +12,10 @@
 // поиске, а не заменяет разговор.
 
 import "dotenv/config";
-import { TelegramClient } from "telegram";
-import { StringSession } from "telegram/sessions/index.js";
-import { NewMessage } from "telegram/events/index.js";
+// teleproto — поддерживаемый форк GramJS: сам GramJS (пакет telegram) заархивирован.
+import { TelegramClient } from "teleproto";
+import { StringSession } from "teleproto/sessions/index.js";
+import { NewMessage } from "teleproto/events/index.js";
 import { matchLead } from "./keywords.js";
 
 const apiId = Number(process.env.TG_API_ID);
@@ -117,7 +118,7 @@ client.addEventHandler(async (event) => {
     if (!chat || chat.className === "User") return;
     if (!isWatched(chat)) return;
 
-    const match = matchLead(text);
+    const match = matchLead(text, chat.title ?? "");
     if (!match) return;
 
     const sender = await event.getSender().catch(() => null);

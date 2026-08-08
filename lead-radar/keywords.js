@@ -9,10 +9,13 @@
 // действительно ищет. Лучше пропустить половину, чем утонуть в шуме и
 // перестать читать уведомления через два дня.
 
-/** Где ищут. Достаточно одного совпадения. */
+/** Где ищут. Достаточно одного совпадения. Падежи важны: «по Дубаю» — тоже лид. */
 export const GEO = [
   "дубай",
   "дубае",
+  "дубая",
+  "дубаю",
+  "дубаем",
   "оаэ",
   "эмират",
   "абу-даби",
@@ -133,8 +136,13 @@ function findMatches(haystack, list) {
  * Разбирает сообщение. Возвращает null, если это не лид, иначе —
  * какие именно слова сработали (их полезно видеть в уведомлении,
  * чтобы на ходу подкручивать словари).
+ *
+ * chatTitle нужен вот зачем: в чате «Русские в Дубае» страну вслух не называют,
+ * она очевидна из контекста. Там пишут просто «думаю купить студию, что
+ * посоветуете». Если требовать гео только в тексте, такие сообщения — а это
+ * лучшие лиды — теряются полностью. Поэтому название чата тоже считается за гео.
  */
-export function matchLead(text) {
+export function matchLead(text, chatTitle = "") {
   if (!text || text.length < MIN_LENGTH) return null;
 
   const haystack = normalize(text);
@@ -143,7 +151,8 @@ export function matchLead(text) {
   if (stop.length) return null;
 
   const geo = findMatches(haystack, GEO);
-  if (!geo.length) return null;
+  const geoFromChat = findMatches(normalize(chatTitle), GEO);
+  if (!geo.length && !geoFromChat.length) return null;
 
   const topic = findMatches(haystack, TOPIC);
   if (!topic.length) return null;
@@ -152,5 +161,9 @@ export function matchLead(text) {
   const intent = findMatches(haystack, INTENT);
   if (!intent.length && !haystack.includes("?")) return null;
 
-  return { geo, topic, intent };
+  return {
+    geo: geo.length ? geo : geoFromChat.map((g) => `${g} (из названия чата)`),
+    topic,
+    intent,
+  };
 }
