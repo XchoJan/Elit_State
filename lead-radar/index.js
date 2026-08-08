@@ -51,6 +51,12 @@ if (!botToken || !chatId) {
   process.exit(1);
 }
 
+// Раз в полчаса пишем в лог, сколько сообщений просмотрено и сколько совпало.
+// Без этого «ноль находок» невозможно отличить от «радар отвалился и молчит» —
+// а это две совершенно разные ситуации с разными действиями.
+const STATS_INTERVAL_MIN = Number(process.env.STATS_INTERVAL_MIN ?? 30);
+const stats = { seen: 0, matched: 0 };
+
 const alertTimestamps = [];
 
 function rateLimited() {
@@ -118,8 +124,12 @@ client.addEventHandler(async (event) => {
     if (!chat || chat.className === "User") return;
     if (!isWatched(chat)) return;
 
+    stats.seen++;
+
     const match = matchLead(text, chat.title ?? "");
     if (!match) return;
+
+    stats.matched++;
 
     const sender = await event.getSender().catch(() => null);
     if (sender?.bot) return;
@@ -165,4 +175,19 @@ console.log(
     : "Слежу за всеми чатами, где вы состоите (сузить: TG_WATCH_CHATS в .env)"
 );
 
-await notify("🟢 Lead radar запущен и слушает чаты.");
+const dialogs = await client.getDialogs({ limit: 200 });
+const chatCount = dialogs.filter((d) => d.isGroup || d.isChannel).length;
+console.log(`Чатов и каналов у аккаунта: ${chatCount}`);
+
+setInterval(() => {
+  console.log(
+    `[${new Date().toLocaleTimeString()}] за ${STATS_INTERVAL_MIN} мин: ` +
+      `просмотрено ${stats.seen}, совпало ${stats.matched}`
+  );
+  stats.seen = 0;
+  stats.matched = 0;
+}, STATS_INTERVAL_MIN * 60_000);
+
+await notify(
+  `🟢 Lead radar запущен и слушает ${chatCount} чатов.`
+);
