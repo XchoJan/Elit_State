@@ -48,5 +48,8 @@ next-env.d.ts
 # заявки с формы (персональные данные)
 /data/leads.json
 
+# список уже показанных находок глобального поиска — рабочий файл радара
+/lead-radar/seen-global.json
+
 # скрипты деплоя (содержат credentials)
 /bash_scripts

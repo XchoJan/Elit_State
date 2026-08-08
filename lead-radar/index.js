@@ -17,6 +17,7 @@ import { TelegramClient } from "teleproto";
 import { StringSession } from "teleproto/sessions/index.js";
 import { NewMessage } from "teleproto/events/index.js";
 import { matchLead } from "./keywords.js";
+import { loadSeen, runGlobalSearch, QUERIES } from "./globalSearch.js";
 
 const apiId = Number(process.env.TG_API_ID);
 const apiHash = process.env.TG_API_HASH;
@@ -247,6 +248,58 @@ setInterval(async () => {
   stats.seen = 0;
   stats.matched = 0;
 }, STATS_INTERVAL_MIN * 60_000);
+
+// --- Глобальный поиск по публичным чатам ---
+// Слушатель выше работает только по чатам, куда вы вступили. Этот цикл ищет
+// по всей публичной части Telegram, поэтому находит людей в чатах, о которых
+// вы даже не знаете. Выключается через GLOBAL_SEARCH_MIN=0.
+const GLOBAL_SEARCH_MIN = Number(process.env.GLOBAL_SEARCH_MIN ?? 25);
+
+async function globalSearchTick() {
+  try {
+    const { findings, scanned, batch } = await runGlobalSearch(client);
+    console.log(
+      `[${new Date().toLocaleTimeString()}] поиск (${batch.join(" · ")}): ` +
+        `новых сообщений ${scanned}, подходящих ${findings.length}`
+    );
+
+    for (const f of findings) {
+      if (rateLimited()) {
+        console.warn("Лимит уведомлений исчерпан — находка поиска пропущена");
+        break;
+      }
+      const preview = f.text.length > 700 ? `${f.text.slice(0, 700)}…` : f.text;
+      await notify(
+        [
+          "🌍 <b>Найдено поиском по Telegram</b>",
+          `💬 Чат: ${escapeHtml(f.title || "без названия")}`,
+          `🔎 По запросу: ${escapeHtml(f.query)}`,
+          "",
+          escapeHtml(preview),
+          "",
+          `🔑 Сработало: ${escapeHtml(
+            [...f.match.geo, ...f.match.topic, ...f.match.intent].join(", ")
+          )}`,
+          f.link ? `\n<a href="${f.link}">Открыть сообщение</a>` : "",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      );
+    }
+  } catch (e) {
+    console.error("Ошибка глобального поиска:", e?.message ?? e);
+  }
+}
+
+if (GLOBAL_SEARCH_MIN > 0) {
+  await loadSeen();
+  console.log(
+    `Глобальный поиск включён: ${QUERIES.length} фраз, заход каждые ${GLOBAL_SEARCH_MIN} мин`
+  );
+  // Первый заход с задержкой: на старте клиент ещё разбирается с соединением.
+  setTimeout(globalSearchTick, 60_000);
+  setInterval(globalSearchTick, GLOBAL_SEARCH_MIN * 60_000);
+}
 
 await notify(
   `🟢 Lead radar запущен и слушает ${chatCount} чатов.`
