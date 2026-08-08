@@ -17,7 +17,7 @@ import { TelegramClient } from "teleproto";
 import { StringSession } from "teleproto/sessions/index.js";
 import { NewMessage } from "teleproto/events/index.js";
 import { matchLead } from "./keywords.js";
-import { loadSeen, runGlobalSearch, QUERIES } from "./globalSearch.js";
+import { loadSeen, markSeen, runGlobalSearch, QUERIES } from "./globalSearch.js";
 
 const apiId = Number(process.env.TG_API_ID);
 const apiHash = process.env.TG_API_HASH;
@@ -205,6 +205,10 @@ client.addEventHandler(async (event) => {
     if (!match) return;
 
     stats.matched++;
+
+    // Помечаем сразу: глобальный поиск через полчаса наткнётся на это же
+    // сообщение, и без отметки вы получите его вторым уведомлением.
+    markSeen(chat?.id ?? message.peerId?.channelId ?? message.peerId?.chatId, message.id);
 
     const sender = await resolveSender(event, message);
     if (sender?.bot) return;

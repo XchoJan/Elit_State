@@ -44,6 +44,17 @@ const SEEN_FILE = path.join(process.cwd(), "seen-global.json");
 /** Больше не храним: файл читается целиком, а старые id всё равно не нужны. */
 const SEEN_LIMIT = 5000;
 
+// Чаты, куда радар пишет сам. Их нельзя ни слушать, ни искать в них:
+// уведомление содержит и город, и слово «квартира», и вопрос — поиск
+// находил собственные сообщения радара и пересылал их обратно, вкладывая
+// одно в другое.
+const OWN_CHAT_IDS = new Set(
+  String(process.env.TELEGRAM_CHAT_ID ?? "")
+    .split(",")
+    .map((id) => id.trim().replace("-100", "").replace(/^-/, ""))
+    .filter(Boolean)
+);
+
 let queryOffset = 0;
 let seen = new Set();
 
@@ -57,6 +68,15 @@ export async function loadSeen() {
   }
 }
 
+/**
+ * Отметить сообщение как уже показанное. Вызывает слушатель: иначе поиск
+ * через полчаса найдёт то же самое и пришлёт второй раз.
+ */
+export function markSeen(chatId, messageId) {
+  if (!chatId || !messageId) return;
+  seen.add(`${String(chatId).replace("-100", "").replace(/^-/, "")}:${messageId}`);
+}
+
 async function saveSeen() {
   try {
     const list = [...seen].slice(-SEEN_LIMIT);
@@ -67,18 +87,19 @@ async function saveSeen() {
   }
 }
 
-/** Название и ссылка на чат по peerId сообщения — из справочника в ответе. */
+/** Название, ссылка и id чата по peerId сообщения — из справочника в ответе. */
 function describeChat(message, chats) {
   const channelId = message.peerId?.channelId ?? message.peerId?.chatId;
-  if (!channelId) return { title: "", link: null };
+  if (!channelId) return { title: "", link: null, id: "" };
 
-  const chat = chats.find((c) => String(c.id) === String(channelId));
+  const id = String(channelId);
+  const chat = chats.find((c) => String(c.id) === id);
   const title = chat?.title ?? "";
   const link = chat?.username
     ? `https://t.me/${chat.username}/${message.id}`
-    : `https://t.me/c/${String(channelId)}/${message.id}`;
+    : `https://t.me/c/${id}/${message.id}`;
 
-  return { title, link };
+  return { title, link, id };
 }
 
 /**
@@ -117,8 +138,12 @@ export async function runGlobalSearch(client) {
         const text = message.message;
         if (!text || message.out) continue;
 
-        const { title, link } = describeChat(message, chats);
-        const key = `${title || "?"}:${message.id}`;
+        const { title, link, id } = describeChat(message, chats);
+        if (OWN_CHAT_IDS.has(id)) continue; // свои же уведомления не ищем
+
+        // Ключ по id чата, а не по названию: название определяется не всегда,
+        // и одно и то же сообщение приходило по нескольку раз.
+        const key = `${id}:${message.id}`;
         if (seen.has(key)) continue;
         seen.add(key);
 
