@@ -87,8 +87,19 @@ console.log(`Разбор истории от имени @${me.username ?? "—"
 const cutoff = Math.floor(Date.now() / 1000) - DAYS * 86400;
 const seen = await loadSeen();
 
+// Свои чаты читать нельзя: уведомления радара сами содержат город, слово
+// «квартира» и вопрос — он находил бы самого себя.
+const ownChats = new Set(
+  String(chatId)
+    .split(",")
+    .map((id) => id.trim().replace("-100", "").replace(/^-/, ""))
+    .filter(Boolean)
+);
+const isOwnChat = (d) =>
+  ownChats.has(String(d.id).replace("-100", "").replace(/^-/, ""));
+
 const dialogs = await client.getDialogs({ limit: 200 });
-const chats = dialogs.filter((d) => d.isGroup || d.isChannel);
+const chats = dialogs.filter((d) => (d.isGroup || d.isChannel) && !isOwnChat(d));
 console.log(`Чатов к разбору: ${chats.length}`);
 
 const findings = [];

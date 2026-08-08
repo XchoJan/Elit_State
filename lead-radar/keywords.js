@@ -250,6 +250,13 @@ export const RENTAL = [
   "коммуналк",
 ];
 
+/**
+ * Признаки арендного чата в его названии. Такие чаты состоят из сдачи
+ * и съёма целиком, и обычные слова «квартира в Ереване» там не значат
+ * ничего. Пропускаем оттуда только сообщения с явным признаком покупки.
+ */
+export const RENTAL_CHAT = ["аренд", "rent", "сдам", "сниму", "съем"];
+
 /** Признаки именно покупки — они перевешивают упоминание аренды. */
 export const BUY_SIGNAL = [
   "купить",
@@ -343,7 +350,10 @@ export function matchLead(text, chatTitle = "") {
   // Аренда без признаков покупки — не наш клиент. Это отсеивает и объявления
   // «сдам 2-комн», и тех, кто ищет жильё на два месяца.
   const buySignals = findMatches(haystack, BUY_SIGNAL);
-  if (findMatches(haystack, RENTAL).length && !buySignals.length) return null;
+  const rentalChat = findMatches(normalize(chatTitle), RENTAL_CHAT).length > 0;
+  if ((findMatches(haystack, RENTAL).length || rentalChat) && !buySignals.length) {
+    return null;
+  }
 
   const geo = findMatches(haystack, GEO);
   const geoFromChat = findMatches(normalize(chatTitle), GEO);
