@@ -87,10 +87,17 @@ async function notify(text) {
   if (!res.ok) console.error("Telegram API:", await res.text());
 }
 
-/** Ссылка на конкретное сообщение: публичные чаты по имени, приватные — через /c/. */
-function messageLink(chat, messageId) {
+/**
+ * Ссылка на конкретное сообщение: публичные чаты по имени, приватные — через /c/.
+ * Если чат разрешить не удалось, id берём прямо из сообщения: ссылка нужнее
+ * названия, по ней всё равно можно открыть переписку.
+ */
+function messageLink(chat, message) {
+  const messageId = message.id;
   if (chat?.username) return `https://t.me/${chat.username}/${messageId}`;
-  if (chat?.id) return `https://t.me/c/${String(chat.id).replace("-100", "")}/${messageId}`;
+
+  const rawId = chat?.id ?? message.peerId?.channelId ?? message.peerId?.chatId;
+  if (rawId) return `https://t.me/c/${String(rawId).replace("-100", "")}/${messageId}`;
   return null;
 }
 
@@ -119,14 +126,20 @@ client.addEventHandler(async (event) => {
     const text = message?.message;
     if (!text || message.out) return; // свои сообщения не анализируем
 
-    const chat = await event.getChat();
+    // getChat() может вернуть undefined: библиотека не всегда находит чат
+    // в кэше сущностей. Раньше на этом месте стоял ранний выход — и радар
+    // молча выбрасывал ВСЕ сообщения. Нераспознанное название чата не повод
+    // терять клиента: без него просто не сработает гео из заголовка.
+    const chat = await event.getChat().catch(() => null);
+    const chatTitle = chat?.title ?? "";
+
     // Личные переписки пропускаем: там и так видно, что пишут.
-    if (!chat || chat.className === "User") return;
+    if (chat?.className === "User") return;
     if (!isWatched(chat)) return;
 
     stats.seen++;
 
-    const match = matchLead(text, chat.title ?? "");
+    const match = matchLead(text, chatTitle);
     if (!match) return;
 
     stats.matched++;
@@ -139,13 +152,13 @@ client.addEventHandler(async (event) => {
       return;
     }
 
-    const link = messageLink(chat, message.id);
+    const link = messageLink(chat, message);
     const preview = text.length > 700 ? `${text.slice(0, 700)}…` : text;
 
     await notify(
       [
         "🎯 <b>Похоже на клиента</b>",
-        `💬 Чат: ${escapeHtml(chat.title ?? "без названия")}`,
+        `💬 Чат: ${escapeHtml(chatTitle || "название не определилось")}`,
         `👤 Автор: ${escapeHtml(senderLabel(sender))}`,
         "",
         escapeHtml(preview),
@@ -159,7 +172,9 @@ client.addEventHandler(async (event) => {
         .join("\n")
     );
 
-    console.log(`[${new Date().toLocaleTimeString()}] находка в «${chat.title}»`);
+    console.log(
+      `[${new Date().toLocaleTimeString()}] находка в «${chatTitle || "чат без названия"}»`
+    );
   } catch (e) {
     console.error("Ошибка обработки сообщения:", e);
   }
