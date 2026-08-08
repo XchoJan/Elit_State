@@ -9,7 +9,7 @@ import { CONTACT_PHONE, CONTACT_PHONE_HREF } from "@/lib/data";
 const nav = [
   { href: "/", label: "Главная" },
   { href: "/#podbor", label: "Подбор" },
-  { href: "/#cities", label: "Города" },
+  { href: "/#cities", label: "Направления" },
   { href: "/about", label: "О нас" },
   { href: "/contacts", label: "Контакты" },
 ];

@@ -20,16 +20,16 @@ export default function Footer() {
 
         <div>
           <h3 className="text-sm font-semibold uppercase tracking-wider text-accent">
-            Города
+            Направления
           </h3>
           <ul className="mt-4 space-y-2.5">
             {cities.map((c) => (
               <li key={c.slug}>
                 <Link
-                  href="/#cities"
+                  href={c.path}
                   className="text-sm text-white/80 transition-colors hover:text-accent"
                 >
-                  {c.country ? `${c.name}, ${c.country}` : c.name}
+                  Недвижимость {c.nameIn}
                 </Link>
               </li>
             ))}

@@ -1,5 +1,7 @@
+import Link from "next/link";
 import Hero from "@/components/Hero";
 import Quiz from "@/components/Quiz";
+import FloorPlans from "@/components/FloorPlans";
 import LeadForm from "@/components/LeadForm";
 import AnimatedNumber from "@/components/AnimatedNumber";
 import { Reveal, RevealItem, RevealStagger } from "@/components/Reveal";
@@ -162,12 +164,12 @@ export default function Home() {
                   <p className="text-sm font-medium text-accent-dark">{c.highlight}</p>
                 </div>
 
-                <a
-                  href="#podbor"
+                <Link
+                  href={c.path}
                   className="mt-5 inline-block text-sm font-semibold text-accent transition-colors hover:text-accent-dark"
                 >
-                  Подобрать {c.nameIn} →
-                </a>
+                  Подробнее о недвижимости {c.nameIn} →
+                </Link>
               </RevealItem>
             ))}
           </RevealStagger>
@@ -175,6 +177,41 @@ export default function Home() {
           <p className="mx-auto mt-6 max-w-3xl text-center text-xs leading-relaxed text-muted">
             {STATS_DISCLAIMER}
           </p>
+        </div>
+      </section>
+
+      {/* Floor plans */}
+      <section id="planirovki" className="scroll-mt-20 py-16 sm:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <Reveal className="text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+              Планировки
+            </p>
+            <h2 className="font-display mt-2 text-3xl font-bold text-brand sm:text-4xl">
+              Что помещается в 50, 60 и 70 м²
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-muted">
+              Одна и та же площадь раскладывается по-разному. Посмотрите типовые
+              решения — и скажите менеджеру, какое вам ближе.
+            </p>
+          </Reveal>
+
+          <Reveal delay={0.12} className="mt-10">
+            <FloorPlans />
+          </Reveal>
+
+          <Reveal delay={0.2} className="mt-10 text-center">
+            <p className="mx-auto max-w-2xl text-xs leading-relaxed text-muted">
+              Схемы типовые и приведены для наглядности — это не конкретные
+              объекты в продаже. Планировки реальных квартир пришлём в подборке.
+            </p>
+            <a
+              href="#podbor"
+              className="mt-5 inline-block rounded-full bg-accent px-8 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:scale-[1.04] hover:bg-accent-dark active:scale-[0.97]"
+            >
+              Подобрать квартиру под мою задачу
+            </a>
+          </Reveal>
         </div>
       </section>
 

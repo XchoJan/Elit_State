@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -31,8 +32,11 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
+# ВАЖНО: lead-radar/.env содержит строку сессии Telegram — это полный доступ
+# к аккаунту, коммитить нельзя ни при каких условиях.
 .env*
 !.env.local.example
+!.env.example
 
 # vercel
 .vercel

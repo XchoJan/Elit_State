@@ -2,8 +2,9 @@
 
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useMemo, useState } from "react";
-import { cities, CONTACT_PHONE } from "@/lib/data";
+import { cities, CONTACT_PHONE, type CitySlug } from "@/lib/data";
 import { GOALS, reachGoal } from "@/lib/analytics";
+import { getAttribution } from "@/lib/attribution";
 
 const EASE: [number, number, number, number] = [0.21, 0.47, 0.32, 0.98];
 
@@ -20,6 +21,8 @@ interface Step {
   question: string;
   subtitle?: string;
   options: Option[];
+  /** Цель Метрики — чтобы видеть, на каком шаге отваливаются. */
+  goal: string;
 }
 
 const UNDECIDED: Option = {
@@ -99,6 +102,7 @@ const PAYMENT_OPTIONS: Record<string, Option[]> = {
 const CITY_STEP: Step = {
   key: "city",
   question: "Где ищете недвижимость?",
+  goal: GOALS.quizStart,
   options: [
     ...cities.map((c) => ({
       value: c.country ? `${c.name} (${c.country})` : c.name,
@@ -115,12 +119,15 @@ const CITY_STEP: Step = {
   ],
 };
 
-function buildSteps(citySlug: string): Step[] {
+// На посадочной странице конкретной страны город уже известен из URL —
+// первый шаг пропускаем: чем меньше кликов до контактов, тем выше конверсия.
+function buildSteps(citySlug: string, askCity: boolean): Step[] {
   return [
-    CITY_STEP,
+    ...(askCity ? [CITY_STEP] : []),
     {
       key: "goal",
       question: "Для чего покупаете?",
+      goal: GOALS.quizGoal,
       options: [
         { value: "Для жизни", label: "🏠 Для себя и семьи" },
         { value: "Инвестиции / аренда", label: "📈 Инвестиции и аренда" },
@@ -132,11 +139,13 @@ function buildSteps(citySlug: string): Step[] {
       key: "budget",
       question: "Какой бюджет рассматриваете?",
       subtitle: "Ориентир по этому направлению — точные цены зависят от объекта",
+      goal: GOALS.quizBudget,
       options: BUDGET_OPTIONS[citySlug] ?? BUDGET_OPTIONS.default,
     },
     {
       key: "rooms",
       question: "Сколько комнат нужно?",
+      goal: GOALS.quizRooms,
       options: [
         { value: "Студия", label: "Студия" },
         { value: "1–2 комнаты", label: "1–2 комнаты" },
@@ -148,11 +157,13 @@ function buildSteps(citySlug: string): Step[] {
       key: "payment",
       question: "Как планируете оплачивать?",
       subtitle: "Подберём объекты под подходящие условия",
+      goal: GOALS.quizPayment,
       options: PAYMENT_OPTIONS[citySlug] ?? PAYMENT_OPTIONS.default,
     },
     {
       key: "timing",
       question: "Когда планируете покупку?",
+      goal: GOALS.quizTiming,
       options: [
         {
           value: "В ближайший месяц",
@@ -166,16 +177,6 @@ function buildSteps(citySlug: string): Step[] {
     },
   ];
 }
-
-// Цель Метрики для каждого шага — чтобы видеть, где именно отваливаются.
-const STEP_GOALS = [
-  GOALS.quizStart,
-  GOALS.quizGoal,
-  GOALS.quizBudget,
-  GOALS.quizRooms,
-  GOALS.quizPayment,
-  GOALS.quizTiming,
-];
 
 const slideVariants: Variants = {
   enter: (dir: number) => ({ opacity: 0, x: dir >= 0 ? 32 : -32 }),
@@ -193,14 +194,30 @@ const optionItem: Variants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: EASE } },
 };
 
-export default function Quiz() {
+/** Название страны так, как оно уйдёт в заявку: «Дубай (ОАЭ)». */
+function cityAnswer(slug: CitySlug): string {
+  const city = cities.find((c) => c.slug === slug);
+  if (!city) return "";
+  return city.country ? `${city.name} (${city.country})` : city.name;
+}
+
+export default function Quiz({
+  city,
+  subject = "Квиз-подбор недвижимости",
+}: {
+  /** Задан на посадочной странице страны — тогда шаг выбора города не показываем. */
+  city?: CitySlug;
+  subject?: string;
+}) {
   const [stepIdx, setStepIdx] = useState(0);
   const [direction, setDirection] = useState(1);
-  const [citySlug, setCitySlug] = useState("default");
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [citySlug, setCitySlug] = useState<string>(city ?? "default");
+  const [answers, setAnswers] = useState<Record<string, string>>(
+    city ? { city: cityAnswer(city) } : {}
+  );
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
 
-  const steps = useMemo(() => buildSteps(citySlug), [citySlug]);
+  const steps = useMemo(() => buildSteps(citySlug, !city), [citySlug, city]);
   const total = steps.length + 1; // + шаг с контактами
   const onContactStep = stepIdx === steps.length;
 
@@ -223,7 +240,7 @@ export default function Quiz() {
       setAnswers((a) => ({ ...a, [key]: option.value }));
     }
 
-    reachGoal(STEP_GOALS[stepIdx], { [key]: option.value });
+    reachGoal(steps[stepIdx].goal, { [key]: option.value });
     // Дошёл до формы контактов — самый важный шаг перед заявкой.
     if (stepIdx + 1 === steps.length) reachGoal(GOALS.quizContacts);
     setDirection(1);
@@ -247,7 +264,9 @@ export default function Quiz() {
         body: JSON.stringify({
           name: data.name,
           phone: data.phone,
-          subject: "Квиз-подбор недвижимости",
+          company: data.company,
+          subject,
+          ...getAttribution(),
           message: [
             `Город: ${answers.city ?? "—"}`,
             `Цель: ${answers.goal ?? "—"}`,
@@ -387,6 +406,15 @@ export default function Quiz() {
                   обычно в течение 15 минут, круглосуточно.
                 </p>
                 <form onSubmit={submit} className="mt-6 space-y-3">
+                  {/* Ловушка для спам-ботов: человек это поле не видит. */}
+                  <input
+                    name="company"
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    aria-hidden="true"
+                    className="absolute left-[-9999px] h-0 w-0 opacity-0"
+                  />
                   <input
                     name="name"
                     required

@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import { useState } from "react";
 import { GOALS, reachGoal } from "@/lib/analytics";
+import { getAttribution } from "@/lib/attribution";
 
 export default function LeadForm({
   subject,
@@ -22,7 +23,11 @@ export default function LeadForm({
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, subject: subject ?? "Общая заявка" }),
+        body: JSON.stringify({
+          ...data,
+          subject: subject ?? "Общая заявка",
+          ...getAttribution(),
+        }),
       });
       if (!res.ok) throw new Error();
       reachGoal(GOALS.leadFormSubmit, { subject: subject ?? "Общая заявка" });
@@ -51,6 +56,15 @@ export default function LeadForm({
 
   return (
     <form onSubmit={handleSubmit} className={compact ? "space-y-3" : "space-y-4"}>
+      {/* Ловушка для спам-ботов: человек это поле не видит и не заполняет. */}
+      <input
+        name="company"
+        type="text"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        className="absolute left-[-9999px] h-0 w-0 opacity-0"
+      />
       <input
         name="name"
         required

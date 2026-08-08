@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { motion, type Variants } from "motion/react";
 import { cities, CONTACT_PHONE, CONTACT_PHONE_HREF } from "@/lib/data";
 
@@ -82,15 +83,15 @@ export default function Hero() {
           className="mt-14 grid w-full max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4"
         >
           {cities.map((c) => (
-            <a
+            <Link
               key={c.slug}
-              href="#cities"
+              href={c.path}
               className="rounded-2xl border border-white/20 bg-white/10 px-4 py-4 text-white backdrop-blur-md transition-all duration-200 hover:scale-[1.04] hover:border-accent hover:bg-white/20"
             >
               <span className="text-2xl">{c.countryFlag}</span>
               <p className="mt-1.5 text-sm font-semibold">{c.name}</p>
               {c.country && <p className="text-xs text-white/70">{c.country}</p>}
-            </a>
+            </Link>
           ))}
         </motion.div>
       </motion.div>

@@ -10,14 +10,18 @@ export function Reveal({
   delay = 0,
   y = 24,
   className,
+  id,
 }: {
   children: ReactNode;
   delay?: number;
   y?: number;
   className?: string;
+  /** Якорь для ссылок вида «#podbor». */
+  id?: string;
 }) {
   return (
     <motion.div
+      id={id}
       className={className}
       initial={{ opacity: 0, y }}
       whileInView={{ opacity: 1, y: 0 }}
