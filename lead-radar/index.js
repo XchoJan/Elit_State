@@ -154,9 +154,17 @@ client.addEventHandler(async (event) => {
     // в кэше сущностей. Раньше на этом месте стоял ранний выход — и радар
     // молча выбрасывал ВСЕ сообщения. Нераспознанное название чата не повод
     // терять клиента: без него просто не сработает гео из заголовка.
-    const chat = await (typeof event.getChat === "function"
+    let chat = await (typeof event.getChat === "function"
       ? event.getChat().catch(() => null)
       : Promise.resolve(null));
+
+    // Запасной путь: спросить сущность напрямую по адресату сообщения.
+    // Без названия чата теряется гео из заголовка, а вам в уведомлении
+    // непонятно, куда идти отвечать.
+    if (!chat && message.peerId) {
+      chat = await client.getEntity(message.peerId).catch(() => null);
+    }
+
     const chatTitle = chat?.title ?? "";
 
     // Личные переписки пропускаем: там и так видно, что пишут.
