@@ -82,7 +82,7 @@ function escapeHtml(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-async function notify(text) {
+async function notify(text, attempt = 0) {
   const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -93,7 +93,17 @@ async function notify(text) {
       link_preview_options: { is_disabled: true },
     }),
   });
-  if (!res.ok) console.error("Telegram API:", await res.text());
+  if (res.ok) return;
+
+  const body = await res.text();
+  // Бот не может слать в группу быстрее ~20 сообщений в минуту. Telegram
+  // честно говорит, сколько ждать, — надо послушаться, иначе находка пропадёт.
+  const retryAfter = /"retry_after":(\d+)/.exec(body)?.[1];
+  if (retryAfter && attempt < 3) {
+    await new Promise((r) => setTimeout(r, (Number(retryAfter) + 1) * 1000));
+    return notify(text, attempt + 1);
+  }
+  console.error("Telegram API:", body);
 }
 
 /**
@@ -130,6 +140,23 @@ function senderLabel(sender) {
   const name = [sender.firstName, sender.lastName].filter(Boolean).join(" ");
   if (sender.username) return `${name || sender.username} (@${sender.username})`;
   return name || "без имени";
+}
+
+// Куда радар сам пишет. Читать эти чаты нельзя: собственные уведомления
+// содержат и город, и слово «квартира», и вопрос — радар находил сам себя
+// и заводился по кругу.
+const OWN_CHATS = new Set(
+  String(chatId)
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean)
+    .flatMap((id) => [id, id.replace("-100", ""), id.replace(/^-/, "")])
+);
+
+function isOwnChat(chat) {
+  if (!chat?.id) return false;
+  const id = String(chat.id);
+  return OWN_CHATS.has(id) || OWN_CHATS.has(`-${id}`) || OWN_CHATS.has(`-100${id}`);
 }
 
 /** Слушаем ли этот чат: по username или по id из TG_WATCH_CHATS. */
@@ -169,6 +196,7 @@ client.addEventHandler(async (event) => {
 
     // Личные переписки пропускаем: там и так видно, что пишут.
     if (chat?.className === "User") return;
+    if (isOwnChat(chat)) return; // свои же уведомления не анализируем
     if (!isWatched(chat)) return;
 
     stats.seen++;
@@ -191,7 +219,7 @@ client.addEventHandler(async (event) => {
 
     await notify(
       [
-        "🎯 <b>Похоже на клиента</b>",
+        `${match.badge} <b>Похоже на клиента</b>`,
         `💬 Чат: ${escapeHtml(chatTitle || "название не определилось")}`,
         `👤 Автор: ${escapeHtml(senderLabel(sender))}`,
         "",

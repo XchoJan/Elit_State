@@ -26,8 +26,10 @@ const chatId = process.env.TELEGRAM_CHAT_ID;
 const DAYS = Number(process.env.BACKFILL_DAYS ?? 14);
 /** Сколько сообщений максимум читать в одном чате. */
 const PER_CHAT_LIMIT = Number(process.env.BACKFILL_PER_CHAT ?? 3000);
-/** Потолок находок: больше полусотни за раз всё равно никто не разберёт. */
-const MAX_FINDINGS = Number(process.env.BACKFILL_MAX ?? 40);
+/** Потолок находок: больше двух десятков за раз всё равно никто не разберёт. */
+const MAX_FINDINGS = Number(process.env.BACKFILL_MAX ?? 25);
+/** Разбор истории шлёт только заметные находки — холодные тонут в объёме. */
+const MIN_SCORE = Number(process.env.BACKFILL_MIN_SCORE ?? 5);
 
 const SEEN_FILE = path.join(process.cwd(), "seen-global.json");
 
@@ -42,7 +44,7 @@ function escapeHtml(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-async function notify(text) {
+async function notify(text, attempt = 0) {
   const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -53,7 +55,17 @@ async function notify(text) {
       link_preview_options: { is_disabled: true },
     }),
   });
-  if (!res.ok) console.error("Telegram API:", await res.text());
+  if (res.ok) return;
+
+  // Бот шлёт в группу не быстрее ~20 сообщений в минуту, а разбор истории
+  // отправляет пачкой. Telegram сам говорит, сколько ждать.
+  const body = await res.text();
+  const retryAfter = /"retry_after":(\d+)/.exec(body)?.[1];
+  if (retryAfter && attempt < 5) {
+    await sleep((Number(retryAfter) + 1) * 1000);
+    return notify(text, attempt + 1);
+  }
+  console.error("Telegram API:", body);
 }
 
 async function loadSeen() {
@@ -115,15 +127,19 @@ for (const dialog of chats) {
 
 console.log(`\nПросмотрено ${scanned} сообщений, найдено ${findings.length}`);
 
-// Свежие интереснее: человек, писавший вчера, ещё в поиске.
-findings.sort((a, b) => (b.message.date ?? 0) - (a.message.date ?? 0));
-const toSend = findings.slice(0, MAX_FINDINGS);
+// Сначала по «горячести», внутри одного уровня — свежие вперёд: человек,
+// писавший вчера, ещё в поиске, а месячной давности запрос обычно закрыт.
+const strong = findings.filter((f) => f.match.score >= MIN_SCORE);
+strong.sort(
+  (a, b) => b.match.score - a.match.score || (b.message.date ?? 0) - (a.message.date ?? 0)
+);
+const toSend = strong.slice(0, MAX_FINDINGS);
 
 await notify(
   `📚 <b>Разбор истории чатов</b>\n` +
     `Просмотрено ${scanned} сообщений за ${DAYS} дней в ${chats.length} чатах.\n` +
-    `Похожих на клиента: <b>${findings.length}</b>` +
-    (findings.length > toSend.length ? `, показываю ${toSend.length} самых свежих` : "")
+    `Совпало всего: ${findings.length}, из них заметных: <b>${strong.length}</b>` +
+    (strong.length > toSend.length ? `\nПоказываю ${toSend.length} лучших.` : "")
 );
 
 for (const f of toSend) {
@@ -136,7 +152,7 @@ for (const f of toSend) {
 
   await notify(
     [
-      `📚 <b>Из истории · ${date}</b>`,
+      `${f.match.badge} <b>Из истории · ${date}</b>`,
       `💬 Чат: ${escapeHtml(f.title)}`,
       "",
       escapeHtml(preview),
