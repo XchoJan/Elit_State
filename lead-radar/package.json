@@ -6,7 +6,9 @@
   "description": "Мониторинг Telegram-чатов по ключевым словам: находит людей, которые ищут недвижимость",
   "scripts": {
     "login": "node login.js",
-    "start": "node index.js"
+    "start": "node index.js",
+    "backfill": "node backfill.js",
+    "discover": "node discoverChats.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
