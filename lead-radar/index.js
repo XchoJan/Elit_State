@@ -63,6 +63,13 @@ const stats = { seen: 0, matched: 0 };
 // Молчание радара неотличимо от затишья в чатах, поэтому он должен
 // сам сказать, что ослеп, — иначе вы неделю ждёте лидов от мёртвого инструмента.
 const SILENT_INTERVALS_TO_ALARM = 3;
+
+// Ниже этого балла находки не присылаем. Холодные («⚪️») — это общие
+// вопросы вроде «сколько стоит квартира», по которым разговор почти никогда
+// не доходит до сделки. Их поток и создаёт ощущение, что радар шлёт мусор.
+// 4 балла — это уровень 🟡: назван бюджет, или город с конкретикой,
+// или явное намерение купить.
+const ALERT_MIN_SCORE = Number(process.env.ALERT_MIN_SCORE ?? 4);
 let silentIntervals = 0;
 let alarmSent = false;
 
@@ -206,6 +213,10 @@ client.addEventHandler(async (event) => {
 
     stats.matched++;
 
+    // Слабые совпадения считаем в статистику, но не показываем: в логе видно,
+    // сколько их, а группу они не засоряют.
+    if (match.score < ALERT_MIN_SCORE) return;
+
     // Помечаем сразу: глобальный поиск через полчаса наткнётся на это же
     // сообщение, и без отметки вы получите его вторым уведомлением.
     markSeen(chat?.id ?? message.peerId?.channelId ?? message.peerId?.chatId, message.id);
@@ -304,6 +315,7 @@ async function globalSearchTick() {
     );
 
     for (const f of findings) {
+      if (f.match.score < ALERT_MIN_SCORE) continue;
       if (rateLimited()) {
         console.warn("Лимит уведомлений исчерпан — находка поиска пропущена");
         break;
