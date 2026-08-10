@@ -45,6 +45,18 @@ const QUERIES = [
 /** Мелкие чаты не окупают шум: ниже этого порога не показываем. */
 const MIN_PARTICIPANTS = Number(process.env.DISCOVER_MIN_MEMBERS ?? 300);
 
+/**
+ * Сколько последних сообщений прочитать, чтобы понять, живой это чат или
+ * витрина объявлений. По названию их не различить: «Недвижимость Дубая»
+ * может быть и лентой агентских постов, и чатом, где спрашивают совета.
+ * Разница видна только в том, КТО и КАК там пишет.
+ */
+const PROBE_MESSAGES = 60;
+/** Витрина — это два-три автора подряд. Живой чат — десятки. */
+const MIN_UNIQUE_SENDERS = 8;
+/** Доля сообщений с вопросом. Где не спрашивают — там нечего ловить. */
+const MIN_QUESTION_SHARE = 0.1;
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function escapeHtml(s) {
@@ -115,23 +127,96 @@ for (const q of QUERIES) {
   await sleep(3000);
 }
 
-const list = [...found.values()].sort((a, b) => b.members - a.members);
-console.log(`Найдено кандидатов: ${list.length}`);
+const candidates = [...found.values()].sort((a, b) => b.members - a.members);
+console.log(`Кандидатов до проверки: ${candidates.length}, читаю по ${PROBE_MESSAGES} сообщений...`);
+
+/**
+ * Заглядываем в чат и считаем признаки жизни. Читать публичные чаты можно
+ * без вступления — как и любой человек через поиск.
+ */
+async function probe(entity) {
+  const senders = new Set();
+  let total = 0;
+  let questions = 0;
+  let oldest = null;
+  let newest = null;
+
+  for await (const m of client.iterMessages(entity, { limit: PROBE_MESSAGES })) {
+    const t = m.message;
+    if (!t) continue;
+    total++;
+    if (t.includes("?")) questions++;
+    if (m.senderId) senders.add(String(m.senderId));
+    if (m.date) {
+      newest ??= m.date;
+      oldest = m.date;
+    }
+  }
+
+  if (!total) return null;
+  const days = Math.max((newest - oldest) / 86400, 0.05);
+  return {
+    total,
+    uniqueSenders: senders.size,
+    questionShare: questions / total,
+    perDay: Math.round(total / days),
+  };
+}
+
+const list = [];
+for (const c of candidates.slice(0, 25)) {
+  if (!c.username) continue; // закрытый чат не прочитать, не вступив
+  try {
+    const entity = await client.getEntity(c.username);
+    const stats = await probe(entity);
+    if (!stats) continue;
+
+    // Витрина: пишут единицы и никто ничего не спрашивает.
+    const alive =
+      stats.uniqueSenders >= MIN_UNIQUE_SENDERS &&
+      stats.questionShare >= MIN_QUESTION_SHARE;
+
+    console.log(
+      `  ${alive ? "живой " : "витрина"} ${c.title.slice(0, 40)} — ` +
+        `авторов ${stats.uniqueSenders}, вопросов ${Math.round(stats.questionShare * 100)}%, ` +
+        `${stats.perDay} сообщ/день`
+    );
+
+    if (alive) list.push({ ...c, ...stats });
+  } catch (e) {
+    const wait = /FLOOD_WAIT_(\d+)/.exec(e?.message ?? "");
+    if (wait) {
+      console.warn(`FLOOD_WAIT ${wait[1]} сек — прекращаю проверку`);
+      break;
+    }
+  }
+  await sleep(2500);
+}
+
+// Сортируем по живости, а не по числу участников: чат на 2000 человек,
+// где пишут пятеро, бесполезнее чата на 500, где спорят каждый день.
+list.sort((a, b) => b.uniqueSenders * b.perDay - a.uniqueSenders * a.perDay);
+console.log(`Живых чатов: ${list.length}`);
 
 if (!list.length) {
-  await notify("🔍 Поиск чатов: подходящих кандидатов не нашлось.");
+  await notify(
+    "🔍 <b>Поиск чатов</b>\nЖивых чатов не нашлось: всё, что попалось, — " +
+      "витрины объявлений, где пишут два-три агента и никто ничего не спрашивает."
+  );
 } else {
   // Режем на части: в одно сообщение Telegram пускает 4096 символов.
   const lines = list.map(
     (c) =>
-      `· <b>${escapeHtml(c.title)}</b> — ${c.members.toLocaleString("ru-RU")} участников` +
-      (c.username ? `\n  https://t.me/${c.username}` : " (закрытый, ссылки нет)")
+      `· <b>${escapeHtml(c.title)}</b>\n` +
+      `  ${c.members.toLocaleString("ru-RU")} участников · ${c.uniqueSenders} авторов ` +
+      `· ${Math.round(c.questionShare * 100)}% вопросов · ~${c.perDay} сообщ/день\n` +
+      `  https://t.me/${c.username}`
   );
 
   await notify(
-    `🔍 <b>Чаты, куда стоит вступить</b>\nНайдено ${list.length} штук, ` +
-      `отсортированы по числу участников.\n\nВступайте вручную: часть окажется ` +
-      `мёртвой или мусорной, это видно только глазами.`
+    `🔍 <b>Живые чаты, куда стоит вступить</b>\nНайдено ${list.length}. ` +
+      `Витрины объявлений отсеяны: в них пишут два-три агента и никто не спрашивает.\n\n` +
+      `Смотрите на «авторов» и «вопросов» — это и есть признак того, что там разговаривают.`
   );
 
   for (let i = 0; i < lines.length; i += 15) {
