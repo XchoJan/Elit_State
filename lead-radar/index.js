@@ -18,6 +18,7 @@ import { StringSession } from "teleproto/sessions/index.js";
 import { NewMessage } from "teleproto/events/index.js";
 import { matchLead } from "./keywords.js";
 import { loadSeen, markSeen, runGlobalSearch, QUERIES } from "./globalSearch.js";
+import { AI_ENABLED, AI_MIN_SCORE, classify, formatCard, temperatureBadge } from "./classifier.js";
 
 const apiId = Number(process.env.TG_API_ID);
 const apiHash = process.env.TG_API_HASH;
@@ -56,7 +57,7 @@ if (!botToken || !chatId) {
 // Без этого «ноль находок» невозможно отличить от «радар отвалился и молчит» —
 // а это две совершенно разные ситуации с разными действиями.
 const STATS_INTERVAL_MIN = Number(process.env.STATS_INTERVAL_MIN ?? 30);
-const stats = { seen: 0, matched: 0 };
+const stats = { seen: 0, matched: 0, aiChecked: 0, aiRejected: 0, aiFailed: 0 };
 
 // Сколько интервалов подряд без единого сообщения считать поломкой.
 // Ровно эта ситуация уже случалась: процесс «online», а сообщений не видит.
@@ -178,6 +179,33 @@ const client = new TelegramClient(new StringSession(session), apiId, apiHash, {
   connectionRetries: 10,
 });
 
+/**
+ * Финальное решение по находке: показывать её или нет.
+ *
+ * Словари сказали «похоже»; модель говорит, покупатель это или нет. Если
+ * модель недоступна или упала — работаем по словарям, как раньше: сбой AI
+ * не должен приводить к потере клиента.
+ */
+async function judge({ text, chatTitle, source, match }) {
+  if (!AI_ENABLED) {
+    return { show: match.score >= ALERT_MIN_SCORE, badge: match.badge, ai: null };
+  }
+
+  const ai = await classify({ text, chatTitle, source });
+  if (!ai) {
+    stats.aiFailed++;
+    return { show: match.score >= ALERT_MIN_SCORE, badge: match.badge, ai: null };
+  }
+
+  stats.aiChecked++;
+  if (!ai.is_lead || ai.lead_score < AI_MIN_SCORE) {
+    stats.aiRejected++;
+    return { show: false, badge: temperatureBadge(ai.temperature), ai };
+  }
+
+  return { show: true, badge: temperatureBadge(ai.temperature), ai };
+}
+
 client.addEventHandler(async (event) => {
   try {
     const message = event.message;
@@ -213,16 +241,17 @@ client.addEventHandler(async (event) => {
 
     stats.matched++;
 
-    // Слабые совпадения считаем в статистику, но не показываем: в логе видно,
-    // сколько их, а группу они не засоряют.
-    if (match.score < ALERT_MIN_SCORE) return;
-
-    // Помечаем сразу: глобальный поиск через полчаса наткнётся на это же
-    // сообщение, и без отметки вы получите его вторым уведомлением.
-    markSeen(chat?.id ?? message.peerId?.channelId ?? message.peerId?.chatId, message.id);
-
     const sender = await resolveSender(event, message);
     if (sender?.bot) return;
+
+    // Последнее слово за моделью: словари только выбрали кандидата.
+    const verdict = await judge({ text, chatTitle, source: "Telegram", match });
+
+    // Помечаем в любом случае, даже отклонённое: иначе глобальный поиск
+    // через полчаса найдёт то же сообщение и оплатит ещё один разбор.
+    markSeen(chat?.id ?? message.peerId?.channelId ?? message.peerId?.chatId, message.id);
+
+    if (!verdict.show) return;
 
     if (rateLimited()) {
       console.warn("Лимит уведомлений исчерпан — сообщение пропущено");
@@ -234,15 +263,22 @@ client.addEventHandler(async (event) => {
 
     await notify(
       [
-        `${match.badge} <b>Похоже на клиента</b>`,
+        `${verdict.badge} <b>Похоже на клиента</b>`,
         `💬 Чат: ${escapeHtml(chatTitle || "название не определилось")}`,
         `👤 Автор: ${escapeHtml(senderLabel(sender))}`,
         "",
         escapeHtml(preview),
         "",
-        `🔑 Сработало: ${escapeHtml(
-          [...match.geo, ...match.topic, ...match.intent].join(", ")
-        )}`,
+        ...(verdict.ai
+          ? [
+              ...formatCard(verdict.ai, escapeHtml),
+              `\n🤖 ${escapeHtml(verdict.ai.reason)} (${verdict.ai.lead_score}/100)`,
+            ]
+          : [
+              `🔑 Сработало: ${escapeHtml(
+                [...match.geo, ...match.topic, ...match.intent].join(", ")
+              )}`,
+            ]),
         link ? `\n<a href="${link}">Открыть сообщение</a>` : "",
       ]
         .filter(Boolean)
@@ -270,11 +306,20 @@ console.log(
 const dialogs = await client.getDialogs({ limit: 200 });
 const chatCount = dialogs.filter((d) => d.isGroup || d.isChannel).length;
 console.log(`Чатов и каналов у аккаунта: ${chatCount}`);
+console.log(
+  AI_ENABLED
+    ? `AI-классификатор включён, порог ${AI_MIN_SCORE}/100`
+    : "AI-классификатор выключен (нет ANTHROPIC_API_KEY) — работают только словари"
+);
 
 setInterval(async () => {
   console.log(
     `[${new Date().toLocaleTimeString()}] за ${STATS_INTERVAL_MIN} мин: ` +
-      `просмотрено ${stats.seen}, совпало ${stats.matched}`
+      `просмотрено ${stats.seen}, совпало ${stats.matched}` +
+      (AI_ENABLED
+        ? `, разобрано AI ${stats.aiChecked}, отсеяно ${stats.aiRejected}` +
+          (stats.aiFailed ? `, сбоев AI ${stats.aiFailed}` : "")
+        : "")
   );
 
   if (stats.seen === 0) {
@@ -298,6 +343,9 @@ setInterval(async () => {
 
   stats.seen = 0;
   stats.matched = 0;
+  stats.aiChecked = 0;
+  stats.aiRejected = 0;
+  stats.aiFailed = 0;
 }, STATS_INTERVAL_MIN * 60_000);
 
 // --- Глобальный поиск по публичным чатам ---
@@ -315,7 +363,14 @@ async function globalSearchTick() {
     );
 
     for (const f of findings) {
-      if (f.match.score < ALERT_MIN_SCORE) continue;
+      const verdict = await judge({
+        text: f.text,
+        chatTitle: f.title,
+        source: "Telegram (поиск)",
+        match: f.match,
+      });
+      if (!verdict.show) continue;
+
       if (rateLimited()) {
         console.warn("Лимит уведомлений исчерпан — находка поиска пропущена");
         break;
@@ -323,15 +378,22 @@ async function globalSearchTick() {
       const preview = f.text.length > 700 ? `${f.text.slice(0, 700)}…` : f.text;
       await notify(
         [
-          "🌍 <b>Найдено поиском по Telegram</b>",
+          `🌍 ${verdict.badge} <b>Найдено поиском по Telegram</b>`,
           `💬 Чат: ${escapeHtml(f.title || "без названия")}`,
           `🔎 По запросу: ${escapeHtml(f.query)}`,
           "",
           escapeHtml(preview),
           "",
-          `🔑 Сработало: ${escapeHtml(
-            [...f.match.geo, ...f.match.topic, ...f.match.intent].join(", ")
-          )}`,
+          ...(verdict.ai
+            ? [
+                ...formatCard(verdict.ai, escapeHtml),
+                `\n🤖 ${escapeHtml(verdict.ai.reason)} (${verdict.ai.lead_score}/100)`,
+              ]
+            : [
+                `🔑 Сработало: ${escapeHtml(
+                  [...f.match.geo, ...f.match.topic, ...f.match.intent].join(", ")
+                )}`,
+              ]),
           f.link ? `\n<a href="${f.link}">Открыть сообщение</a>` : "",
         ]
           .filter(Boolean)
