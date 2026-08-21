@@ -2,13 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "images.unsplash.com",
-        pathname: "/**",
-      },
-    ],
+    // Процессор VPS старее, чем x86-64-v2, а собранные бинарники sharp
+    // требуют именно её — модуль там не запускается вообще. Без sharp
+    // /_next/image молча отдавал исходники в полный вес (фон первого экрана
+    // приходил на 482 КБ при любом запрошенном размере). Поэтому оптимизацию
+    // на лету выключаем, а картинки кладём в public уже сжатыми: их отдаёт
+    // nginx статикой, что на слабом сервере всё равно быстрее.
+    unoptimized: true,
   },
 };
 

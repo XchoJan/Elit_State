@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { Reveal, RevealItem, RevealStagger } from "@/components/Reveal";
 import { cities, CONTACT_PHONE, CONTACT_PHONE_HREF } from "@/lib/data";
@@ -93,12 +92,16 @@ export default function AboutPage() {
             </ul>
           </Reveal>
           <Reveal className="relative aspect-[3/4] overflow-hidden rounded-3xl">
-            <Image
-              src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1200&q=80"
-              alt="Команда Elite Estate"
-              fill
+            <img
+              src="/img/about-720.webp"
+              srcSet="/img/about-480.webp 480w, /img/about-720.webp 720w"
               sizes="(max-width: 1024px) 100vw, 50vw"
-              className="object-cover"
+              alt="Ключи от квартиры рядом с макетом дома"
+              width={720}
+              height={960}
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover"
             />
           </Reveal>
         </div>

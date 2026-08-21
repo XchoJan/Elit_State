@@ -1,16 +1,13 @@
 "use client";
 
-import Image, { type StaticImageData } from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
-import plan501 from "@/public/floorplans/plan-50-1.png";
-import plan502 from "@/public/floorplans/plan-50-2.png";
-import plan601 from "@/public/floorplans/plan-60-1.png";
-import plan602 from "@/public/floorplans/plan-60-2.png";
-import plan701 from "@/public/floorplans/plan-70-1.png";
-import plan702 from "@/public/floorplans/plan-70-2.png";
 
+// Картинки заранее сжаты в webp и лежат в public: у процессора на сервере
+// нет микроархитектуры x86-64-v2, поэтому sharp там не запускается и
+// оптимизатор Next отдавал бы исходные png в полный вес.
 interface Plan {
-  src: StaticImageData;
+  /** Имя файла без размера и расширения: plan-50-1 → plan-50-1-720.webp */
+  file: string;
   area: string;
   title: string;
   note: string;
@@ -18,37 +15,37 @@ interface Plan {
 
 const plans: Plan[] = [
   {
-    src: plan501,
+    file: "plan-50-1",
     area: "50 м²",
     title: "1 спальня",
     note: "Для пары или под аренду: изолированная спальня и просторная гостиная-кухня.",
   },
   {
-    src: plan502,
+    file: "plan-50-2",
     area: "50 м²",
     title: "Студия с гардеробной",
     note: "Максимум открытого пространства — популярный формат под посуточную аренду.",
   },
   {
-    src: plan601,
+    file: "plan-60-1",
     area: "60 м²",
     title: "2 спальни",
     note: "Компактная семейная планировка: детская и родительская спальни.",
   },
   {
-    src: plan602,
+    file: "plan-60-2",
     area: "60 м²",
     title: "Спальня и кабинет",
     note: "Для тех, кто работает из дома: отдельный кабинет вместо второй спальни.",
   },
   {
-    src: plan701,
+    file: "plan-70-1",
     area: "70 м²",
     title: "2 спальни, 2 санузла",
     note: "Второй санузел при спальне — заметно удобнее для семьи и гостей.",
   },
   {
-    src: plan702,
+    file: "plan-70-2",
     area: "70 м²",
     title: "3 спальни",
     note: "Максимум комнат при той же площади: две детские и родительская.",
@@ -99,14 +96,17 @@ export default function FloorPlans() {
         >
           {plans.map((p, i) => (
             <div key={p.area + p.title} className="w-full shrink-0 snap-center">
-              <Image
-                src={p.src}
-                alt={`Планировка квартиры ${p.area} — ${p.title}`}
+              <img
+                src={`/floorplans/${p.file}-720.webp`}
+                srcSet={`/floorplans/${p.file}-720.webp 720w, /floorplans/${p.file}-1080.webp 1080w`}
                 sizes="(max-width: 768px) 100vw, 720px"
-                placeholder="blur"
-                priority={i === 0}
+                alt={`Планировка квартиры ${p.area} — ${p.title}`}
+                width={1080}
+                height={1080}
+                loading={i === 0 ? "eager" : "lazy"}
+                decoding="async"
                 draggable={false}
-                className="w-full select-none"
+                className="h-auto w-full select-none"
               />
             </div>
           ))}
