@@ -1,30 +1,34 @@
 // Lead radar — слушает Telegram-чаты, в которых вы состоите, и присылает
-// вам в личку сообщения, похожие на запрос покупателя недвижимости.
+// вам сообщения, похожие на запрос клиента.
+//
+// Тем может быть несколько, и у каждой свой чат для находок: недвижимость —
+// в один, заказы на разработку — в другой. Что именно ищется и куда уходит,
+// описано в profiles.js; этот файл про темы ничего не знает и просто гоняет
+// каждое сообщение через все включённые профили.
 //
 // Что он делает: читает поток новых сообщений вашим же аккаунтом (как если бы
-// вы сами листали чаты), фильтрует по словарям из keywords.js и пересылает
+// вы сами листали чаты), фильтрует по словарям профиля и пересылает
 // подходящее вашему боту со ссылкой на оригинал.
 //
 // Чего он НЕ делает и делать не должен: не пишет никому автоматически.
 // Отвечает человек, руками, по правилам конкретного чата. Автоответы и
 // рассылки в личку — прямой путь к бану аккаунта и к тому, что администраторы
-// закроют вам вход в лучшие чаты релокантов. Инструмент экономит время на
-// поиске, а не заменяет разговор.
+// закроют вам вход в лучшие чаты. Инструмент экономит время на поиске,
+// а не заменяет разговор.
 
 import "dotenv/config";
 // teleproto — поддерживаемый форк GramJS: сам GramJS (пакет telegram) заархивирован.
 import { TelegramClient } from "teleproto";
 import { StringSession } from "teleproto/sessions/index.js";
 import { NewMessage } from "teleproto/events/index.js";
-import { matchLead } from "./keywords.js";
-import { loadSeen, markSeen, runGlobalSearch, QUERIES } from "./globalSearch.js";
+import { PROFILES, DISABLED_PROFILES, isOwnChat } from "./profiles.js";
+import { loadSeen, markSeen, runGlobalSearch, buildQueue } from "./globalSearch.js";
 import { AI_ENABLED, AI_MIN_SCORE, classify, formatCard, temperatureBadge } from "./classifier.js";
 
 const apiId = Number(process.env.TG_API_ID);
 const apiHash = process.env.TG_API_HASH;
 const session = process.env.TG_SESSION;
 const botToken = process.env.TELEGRAM_BOT_TOKEN;
-const chatId = process.env.TELEGRAM_CHAT_ID;
 
 // Пустой список = слушаем все чаты, где вы состоите.
 const WATCH = (process.env.TG_WATCH_CHATS ?? "")
@@ -32,8 +36,10 @@ const WATCH = (process.env.TG_WATCH_CHATS ?? "")
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
-// Не больше N уведомлений в минуту: если словари настроены слишком широко,
-// лучше упереться в потолок, чем получить 500 сообщений и всё выключить.
+// Не больше N уведомлений в минуту НА ТЕМУ: если словари настроены слишком
+// широко, лучше упереться в потолок, чем получить 500 сообщений и всё
+// выключить. Счётчик отдельный для каждой темы — разговорчивая разработка
+// не должна съедать лимит недвижимости.
 const MAX_ALERTS_PER_MINUTE = Number(process.env.MAX_ALERTS_PER_MINUTE ?? 12);
 
 if (!apiId || !apiHash || !session) {
@@ -45,10 +51,18 @@ if (!apiId || !apiHash || !session) {
   process.exit(1);
 }
 
-if (!botToken || !chatId) {
+if (!botToken) {
   console.error(
-    "Не заданы TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID — некуда присылать находки.\n" +
-      "Возьмите те же значения, что и для сайта (.env.local)."
+    "Не задан TELEGRAM_BOT_TOKEN — нечем присылать находки.\n" +
+      "Возьмите то же значение, что и для сайта (.env.local)."
+  );
+  process.exit(1);
+}
+
+if (!PROFILES.length) {
+  console.error(
+    "Ни одной темы не настроено — некуда присылать находки.\n" +
+      "Задайте TELEGRAM_CHAT_ID (недвижимость) и/или TELEGRAM_CHAT_ID_DEV (разработка)."
   );
   process.exit(1);
 }
@@ -57,7 +71,9 @@ if (!botToken || !chatId) {
 // Без этого «ноль находок» невозможно отличить от «радар отвалился и молчит» —
 // а это две совершенно разные ситуации с разными действиями.
 const STATS_INTERVAL_MIN = Number(process.env.STATS_INTERVAL_MIN ?? 30);
-const stats = { seen: 0, matched: 0, aiChecked: 0, aiRejected: 0, aiFailed: 0 };
+const stats = { seen: 0, aiChecked: 0, aiRejected: 0, aiFailed: 0 };
+/** Совпадений по каждой теме отдельно: видно, какая из них приносит поток. */
+const matchedByProfile = new Map(PROFILES.map((p) => [p.id, 0]));
 
 // Сколько интервалов подряд без единого сообщения считать поломкой.
 // Ровно эта ситуация уже случалась: процесс «online», а сообщений не видит.
@@ -68,21 +84,20 @@ const SILENT_INTERVALS_TO_ALARM = 3;
 // Ниже этого балла находки не присылаем. Холодные («⚪️») — это общие
 // вопросы вроде «сколько стоит квартира», по которым разговор почти никогда
 // не доходит до сделки. Их поток и создаёт ощущение, что радар шлёт мусор.
-// 4 балла — это уровень 🟡: назван бюджет, или город с конкретикой,
-// или явное намерение купить.
+// 4 балла — это уровень 🟡: назван бюджет, или конкретика, или явное намерение.
 const ALERT_MIN_SCORE = Number(process.env.ALERT_MIN_SCORE ?? 4);
 let silentIntervals = 0;
 let alarmSent = false;
 
-const alertTimestamps = [];
+/** Отметки времени отправок по каждой теме — для потолка в минуту. */
+const alertTimestamps = new Map(PROFILES.map((p) => [p.id, []]));
 
-function rateLimited() {
+function rateLimited(profileId) {
+  const marks = alertTimestamps.get(profileId) ?? [];
   const now = Date.now();
-  while (alertTimestamps.length && now - alertTimestamps[0] > 60_000) {
-    alertTimestamps.shift();
-  }
-  if (alertTimestamps.length >= MAX_ALERTS_PER_MINUTE) return true;
-  alertTimestamps.push(now);
+  while (marks.length && now - marks[0] > 60_000) marks.shift();
+  if (marks.length >= MAX_ALERTS_PER_MINUTE) return true;
+  marks.push(now);
   return false;
 }
 
@@ -90,7 +105,7 @@ function escapeHtml(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-async function notify(text, attempt = 0) {
+async function sendTo(chatId, text, attempt = 0) {
   const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -109,9 +124,19 @@ async function notify(text, attempt = 0) {
   const retryAfter = /"retry_after":(\d+)/.exec(body)?.[1];
   if (retryAfter && attempt < 3) {
     await new Promise((r) => setTimeout(r, (Number(retryAfter) + 1) * 1000));
-    return notify(text, attempt + 1);
+    return sendTo(chatId, text, attempt + 1);
   }
-  console.error("Telegram API:", body);
+  console.error(`Telegram API (чат ${chatId}):`, body);
+}
+
+/** Находка уходит только в чаты своей темы. */
+async function notify(profile, text) {
+  await Promise.all(profile.chatIds.map((id) => sendTo(id, text)));
+}
+
+/** Служебные сообщения (запуск, «радар ослеп») касаются всех тем. */
+async function notifyAll(text) {
+  await Promise.all(PROFILES.map((p) => notify(p, text)));
 }
 
 /**
@@ -150,23 +175,6 @@ function senderLabel(sender) {
   return name || "без имени";
 }
 
-// Куда радар сам пишет. Читать эти чаты нельзя: собственные уведомления
-// содержат и город, и слово «квартира», и вопрос — радар находил сам себя
-// и заводился по кругу.
-const OWN_CHATS = new Set(
-  String(chatId)
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean)
-    .flatMap((id) => [id, id.replace("-100", ""), id.replace(/^-/, "")])
-);
-
-function isOwnChat(chat) {
-  if (!chat?.id) return false;
-  const id = String(chat.id);
-  return OWN_CHATS.has(id) || OWN_CHATS.has(`-${id}`) || OWN_CHATS.has(`-100${id}`);
-}
-
 /** Слушаем ли этот чат: по username или по id из TG_WATCH_CHATS. */
 function isWatched(chat) {
   if (!WATCH.length) return true;
@@ -182,16 +190,16 @@ const client = new TelegramClient(new StringSession(session), apiId, apiHash, {
 /**
  * Финальное решение по находке: показывать её или нет.
  *
- * Словари сказали «похоже»; модель говорит, покупатель это или нет. Если
- * модель недоступна или упала — работаем по словарям, как раньше: сбой AI
- * не должен приводить к потере клиента.
+ * Словари сказали «похоже»; модель говорит, клиент это или нет — со своим
+ * промптом для каждой темы. Если модель недоступна или упала — работаем по
+ * словарям, как раньше: сбой AI не должен приводить к потере клиента.
  */
-async function judge({ text, chatTitle, source, match }) {
+async function judge({ text, chatTitle, source, match, profile }) {
   if (!AI_ENABLED) {
     return { show: match.score >= ALERT_MIN_SCORE, badge: match.badge, ai: null };
   }
 
-  const ai = await classify({ text, chatTitle, source });
+  const ai = await classify({ text, chatTitle, source, profile: profile.id });
   if (!ai) {
     stats.aiFailed++;
     return { show: match.score >= ALERT_MIN_SCORE, badge: match.badge, ai: null };
@@ -204,6 +212,21 @@ async function judge({ text, chatTitle, source, match }) {
   }
 
   return { show: true, badge: temperatureBadge(ai.temperature), ai };
+}
+
+/** Разбор находки — одинаковый для слушателя и для поиска. */
+function verdictLines(verdict, match, profile) {
+  if (verdict.ai) {
+    return [
+      ...formatCard(verdict.ai, escapeHtml, profile.id),
+      `\n🤖 ${escapeHtml(verdict.ai.reason)} (${verdict.ai.lead_score}/100)`,
+    ];
+  }
+  return [
+    `🔑 Сработало: ${escapeHtml(
+      [...match.geo, ...match.topic, ...match.intent].join(", ")
+    )}`,
+  ];
 }
 
 client.addEventHandler(async (event) => {
@@ -236,58 +259,58 @@ client.addEventHandler(async (event) => {
 
     stats.seen++;
 
-    const match = matchLead(text, chatTitle);
-    if (!match) return;
+    // Сообщение может подойти сразу двум темам («нужен сайт для агентства
+    // недвижимости») — тогда оно уйдёт в оба чата, каждый со своим разбором.
+    const hits = PROFILES
+      .map((profile) => ({ profile, match: profile.match(text, chatTitle) }))
+      .filter((h) => h.match);
 
-    stats.matched++;
+    if (!hits.length) return;
+
+    for (const { profile } of hits) {
+      matchedByProfile.set(profile.id, (matchedByProfile.get(profile.id) ?? 0) + 1);
+    }
 
     const sender = await resolveSender(event, message);
     if (sender?.bot) return;
-
-    // Последнее слово за моделью: словари только выбрали кандидата.
-    const verdict = await judge({ text, chatTitle, source: "Telegram", match });
 
     // Помечаем в любом случае, даже отклонённое: иначе глобальный поиск
     // через полчаса найдёт то же сообщение и оплатит ещё один разбор.
     markSeen(chat?.id ?? message.peerId?.channelId ?? message.peerId?.chatId, message.id);
 
-    if (!verdict.show) return;
-
-    if (rateLimited()) {
-      console.warn("Лимит уведомлений исчерпан — сообщение пропущено");
-      return;
-    }
-
     const link = messageLink(chat, message);
     const preview = text.length > 700 ? `${text.slice(0, 700)}…` : text;
 
-    await notify(
-      [
-        `${verdict.badge} <b>Похоже на клиента</b>`,
-        `💬 Чат: ${escapeHtml(chatTitle || "название не определилось")}`,
-        `👤 Автор: ${escapeHtml(senderLabel(sender))}`,
-        "",
-        escapeHtml(preview),
-        "",
-        ...(verdict.ai
-          ? [
-              ...formatCard(verdict.ai, escapeHtml),
-              `\n🤖 ${escapeHtml(verdict.ai.reason)} (${verdict.ai.lead_score}/100)`,
-            ]
-          : [
-              `🔑 Сработало: ${escapeHtml(
-                [...match.geo, ...match.topic, ...match.intent].join(", ")
-              )}`,
-            ]),
-        link ? `\n<a href="${link}">Открыть сообщение</a>` : "",
-      ]
-        .filter(Boolean)
-        .join("\n")
-    );
+    for (const { profile, match } of hits) {
+      const verdict = await judge({ text, chatTitle, source: "Telegram", match, profile });
+      if (!verdict.show) continue;
 
-    console.log(
-      `[${new Date().toLocaleTimeString()}] находка в «${chatTitle || "чат без названия"}»`
-    );
+      if (rateLimited(profile.id)) {
+        console.warn(`Лимит уведомлений по теме «${profile.label}» исчерпан`);
+        continue;
+      }
+
+      await notify(
+        profile,
+        [
+          `${verdict.badge} <b>${profile.alertTitle}</b>`,
+          `💬 Чат: ${escapeHtml(chatTitle || "название не определилось")}`,
+          `👤 Автор: ${escapeHtml(senderLabel(sender))}`,
+          "",
+          escapeHtml(preview),
+          "",
+          ...verdictLines(verdict, match, profile),
+          link ? `\n<a href="${link}">Открыть сообщение</a>` : "",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      );
+
+      console.log(
+        `[${new Date().toLocaleTimeString()}] ${profile.label}: находка в ` +
+          `«${chatTitle || "чат без названия"}»`
+      );
+    }
   } catch (e) {
     console.error("Ошибка обработки сообщения:", e);
   }
@@ -303,6 +326,15 @@ console.log(
     : "Слежу за всеми чатами, где вы состоите (сузить: TG_WATCH_CHATS в .env)"
 );
 
+for (const p of PROFILES) {
+  console.log(
+    `Тема «${p.label}» → чат ${p.chatIds.join(", ")}, фраз для поиска: ${p.queries.length}`
+  );
+}
+for (const p of DISABLED_PROFILES) {
+  console.log(`Тема «${p.label}» выключена: не задан отдельный чат для находок`);
+}
+
 const dialogs = await client.getDialogs({ limit: 200 });
 const chatCount = dialogs.filter((d) => d.isGroup || d.isChannel).length;
 console.log(`Чатов и каналов у аккаунта: ${chatCount}`);
@@ -313,9 +345,12 @@ console.log(
 );
 
 setInterval(async () => {
+  const perProfile = PROFILES
+    .map((p) => `${p.label} ${matchedByProfile.get(p.id) ?? 0}`)
+    .join(", ");
   console.log(
     `[${new Date().toLocaleTimeString()}] за ${STATS_INTERVAL_MIN} мин: ` +
-      `просмотрено ${stats.seen}, совпало ${stats.matched}` +
+      `просмотрено ${stats.seen}, совпало — ${perProfile}` +
       (AI_ENABLED
         ? `, разобрано AI ${stats.aiChecked}, отсеяно ${stats.aiRejected}` +
           (stats.aiFailed ? `, сбоев AI ${stats.aiFailed}` : "")
@@ -326,7 +361,7 @@ setInterval(async () => {
     silentIntervals++;
     if (silentIntervals >= SILENT_INTERVALS_TO_ALARM && !alarmSent) {
       alarmSent = true;
-      await notify(
+      await notifyAll(
         `🔴 <b>Радар не видит сообщений</b>\n` +
           `Уже ${silentIntervals * STATS_INTERVAL_MIN} минут подряд — ни одного сообщения ` +
           `из ${chatCount} чатов.\n\nЛибо чаты действительно молчат, либо радар ослеп. ` +
@@ -335,28 +370,30 @@ setInterval(async () => {
     }
   } else {
     if (alarmSent) {
-      await notify("🟢 Радар снова видит сообщения — поток восстановился.");
+      await notifyAll("🟢 Радар снова видит сообщения — поток восстановился.");
     }
     silentIntervals = 0;
     alarmSent = false;
   }
 
   stats.seen = 0;
-  stats.matched = 0;
   stats.aiChecked = 0;
   stats.aiRejected = 0;
   stats.aiFailed = 0;
+  for (const p of PROFILES) matchedByProfile.set(p.id, 0);
 }, STATS_INTERVAL_MIN * 60_000);
 
 // --- Глобальный поиск по публичным чатам ---
 // Слушатель выше работает только по чатам, куда вы вступили. Этот цикл ищет
 // по всей публичной части Telegram, поэтому находит людей в чатах, о которых
-// вы даже не знаете. Выключается через GLOBAL_SEARCH_MIN=0.
+// вы даже не знаете. Для разработки это основной источник: в чатах про
+// недвижимость заказы на сайты почти не встречаются.
+// Выключается через GLOBAL_SEARCH_MIN=0.
 const GLOBAL_SEARCH_MIN = Number(process.env.GLOBAL_SEARCH_MIN ?? 25);
 
 async function globalSearchTick() {
   try {
-    const { findings, scanned, batch } = await runGlobalSearch(client);
+    const { findings, scanned, batch } = await runGlobalSearch(client, PROFILES);
     console.log(
       `[${new Date().toLocaleTimeString()}] поиск (${batch.join(" · ")}): ` +
         `новых сообщений ${scanned}, подходящих ${findings.length}`
@@ -368,32 +405,25 @@ async function globalSearchTick() {
         chatTitle: f.title,
         source: "Telegram (поиск)",
         match: f.match,
+        profile: f.profile,
       });
       if (!verdict.show) continue;
 
-      if (rateLimited()) {
-        console.warn("Лимит уведомлений исчерпан — находка поиска пропущена");
-        break;
+      if (rateLimited(f.profile.id)) {
+        console.warn(`Лимит по теме «${f.profile.label}» исчерпан — находка пропущена`);
+        continue;
       }
       const preview = f.text.length > 700 ? `${f.text.slice(0, 700)}…` : f.text;
       await notify(
+        f.profile,
         [
-          `🌍 ${verdict.badge} <b>Найдено поиском по Telegram</b>`,
+          `🌍 ${verdict.badge} <b>${f.profile.alertTitle} — найдено поиском</b>`,
           `💬 Чат: ${escapeHtml(f.title || "без названия")}`,
           `🔎 По запросу: ${escapeHtml(f.query)}`,
           "",
           escapeHtml(preview),
           "",
-          ...(verdict.ai
-            ? [
-                ...formatCard(verdict.ai, escapeHtml),
-                `\n🤖 ${escapeHtml(verdict.ai.reason)} (${verdict.ai.lead_score}/100)`,
-              ]
-            : [
-                `🔑 Сработало: ${escapeHtml(
-                  [...f.match.geo, ...f.match.topic, ...f.match.intent].join(", ")
-                )}`,
-              ]),
+          ...verdictLines(verdict, f.match, f.profile),
           f.link ? `\n<a href="${f.link}">Открыть сообщение</a>` : "",
         ]
           .filter(Boolean)
@@ -407,14 +437,21 @@ async function globalSearchTick() {
 
 if (GLOBAL_SEARCH_MIN > 0) {
   await loadSeen();
+  const queue = buildQueue(PROFILES);
   console.log(
-    `Глобальный поиск включён: ${QUERIES.length} фраз, заход каждые ${GLOBAL_SEARCH_MIN} мин`
+    `Глобальный поиск включён: ${queue.length} фраз по ${PROFILES.length} темам, ` +
+      `заход каждые ${GLOBAL_SEARCH_MIN} мин`
   );
   // Первый заход с задержкой: на старте клиент ещё разбирается с соединением.
   setTimeout(globalSearchTick, 60_000);
   setInterval(globalSearchTick, GLOBAL_SEARCH_MIN * 60_000);
 }
 
-await notify(
-  `🟢 Lead radar запущен и слушает ${chatCount} чатов.`
-);
+// Каждая тема здоровается в своём чате: сразу видно, что канал подключён
+// правильно и находки пойдут именно туда.
+for (const profile of PROFILES) {
+  await notify(
+    profile,
+    `🟢 Lead radar запущен. Тема: <b>${profile.label}</b>. Слушает ${chatCount} чатов.`
+  );
+}

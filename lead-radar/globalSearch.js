@@ -4,6 +4,10 @@
 // снимает ограничение: он ищет по всем публичным сообщениям сети — так же,
 // как поиск в самом приложении, только по расписанию и с разбором результатов.
 //
+// Для второй темы это вообще главный источник: заказы на разработку в чатах
+// про недвижимость почти не встречаются, а по всей публичной сети — сколько
+// угодно.
+//
 // Осторожность здесь не декоративная. Частые поисковые запросы Telegram
 // считает подозрительными и отвечает FLOOD_WAIT, а при упорстве может
 // ограничить аккаунт. Поэтому: небольшой список фраз, ротация по несколько
@@ -12,24 +16,7 @@
 import { readFile, writeFile } from "fs/promises";
 import path from "path";
 import { Api } from "teleproto";
-import { matchLead } from "./keywords.js";
-
-/**
- * Фразы для поиска. Короткие и конкретные работают лучше длинных:
- * Telegram ищет по вхождению слов, а не по смыслу.
- */
-export const QUERIES = [
-  "купить квартиру в Дубае",
-  "недвижимость в Дубае",
-  "квартира в Дубае",
-  "купить квартиру в Ереване",
-  "недвижимость в Ереване",
-  "купить квартиру в Батуми",
-  "квартира в Тбилиси",
-  "недвижимость в Грузии",
-  "инвестиции в недвижимость Дубай",
-  "ВНЖ Грузия недвижимость",
-];
+import { isOwnChat } from "./profiles.js";
 
 /** Сколько фраз прогонять за один заход — остальные подождут следующего. */
 const QUERIES_PER_RUN = 3;
@@ -44,21 +31,27 @@ const SEEN_FILE = path.join(process.cwd(), "seen-global.json");
 /** Больше не храним: файл читается целиком, а старые id всё равно не нужны. */
 const SEEN_LIMIT = 5000;
 
-// Чаты, куда радар пишет сам. Их нельзя ни слушать, ни искать в них:
-// уведомление содержит и город, и слово «квартира», и вопрос — поиск
-// находил собственные сообщения радара и пересылал их обратно, вкладывая
-// одно в другое.
-const OWN_CHAT_IDS = new Set(
-  String(process.env.TELEGRAM_CHAT_ID ?? "")
-    .split(",")
-    .map((id) => id.trim().replace("-100", "").replace(/^-/, ""))
-    .filter(Boolean)
-);
-
 let queryOffset = 0;
 let seen = new Set();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Общая очередь фраз, где темы чередуются: estate, dev, estate, dev…
+ *
+ * Если просто склеить списки, то при трёх фразах за заход первые часы уходили
+ * бы только на недвижимость, а разработка ждала бы своей очереди полдня.
+ */
+export function buildQueue(profiles) {
+  const queue = [];
+  const longest = Math.max(...profiles.map((p) => p.queries.length), 0);
+  for (let i = 0; i < longest; i++) {
+    for (const profile of profiles) {
+      if (i < profile.queries.length) queue.push({ profile, query: profile.queries[i] });
+    }
+  }
+  return queue;
+}
 
 export async function loadSeen() {
   try {
@@ -105,24 +98,30 @@ function describeChat(message, chats) {
 /**
  * Прогоняет очередную порцию фраз. Возвращает находки — отправкой занимается
  * вызывающий код, чтобы вся работа с Telegram-ботом жила в одном месте.
+ *
+ * Сообщение разбирается словарями того профиля, чьей фразой его нашли:
+ * запрос «ищу разработчика» ищет заказчика, а не покупателя квартиры.
  */
-export async function runGlobalSearch(client) {
+export async function runGlobalSearch(client, profiles) {
+  const queue = buildQueue(profiles);
+  if (!queue.length) return { findings: [], scanned: 0, batch: [] };
+
   const minDate = Math.floor(Date.now() / 1000) - LOOKBACK_DAYS * 86400;
   const findings = [];
   let scanned = 0;
 
   // Ротация: за раз берём несколько фраз, следующий заход продолжит со следующей.
   const batch = [];
-  for (let i = 0; i < QUERIES_PER_RUN; i++) {
-    batch.push(QUERIES[(queryOffset + i) % QUERIES.length]);
+  for (let i = 0; i < Math.min(QUERIES_PER_RUN, queue.length); i++) {
+    batch.push(queue[(queryOffset + i) % queue.length]);
   }
-  queryOffset = (queryOffset + QUERIES_PER_RUN) % QUERIES.length;
+  queryOffset = (queryOffset + batch.length) % queue.length;
 
-  for (const q of batch) {
+  for (const { profile, query } of batch) {
     try {
       const res = await client.invoke(
         new Api.messages.SearchGlobal({
-          q,
+          q: query,
           filter: new Api.InputMessagesFilterEmpty({}),
           minDate,
           maxDate: 0,
@@ -139,7 +138,7 @@ export async function runGlobalSearch(client) {
         if (!text || message.out) continue;
 
         const { title, link, id } = describeChat(message, chats);
-        if (OWN_CHAT_IDS.has(id)) continue; // свои же уведомления не ищем
+        if (isOwnChat(id)) continue; // свои же уведомления не ищем
 
         // Ключ по id чата, а не по названию: название определяется не всегда,
         // и одно и то же сообщение приходило по нескольку раз.
@@ -148,22 +147,22 @@ export async function runGlobalSearch(client) {
         seen.add(key);
 
         scanned++;
-        const match = matchLead(text, title);
-        if (match) findings.push({ text, title, link, match, query: q });
+        const match = profile.match(text, title);
+        if (match) findings.push({ text, title, link, match, query, profile });
       }
     } catch (e) {
       const wait = /FLOOD_WAIT_(\d+)/.exec(e?.message ?? "");
       if (wait) {
         // Telegram просит подождать — спорить бессмысленно и вредно для аккаунта.
-        console.warn(`Поиск «${q}»: FLOOD_WAIT ${wait[1]} сек, пропускаю заход`);
+        console.warn(`Поиск «${query}»: FLOOD_WAIT ${wait[1]} сек, пропускаю заход`);
         break;
       }
-      console.error(`Ошибка поиска «${q}»:`, e?.message ?? e);
+      console.error(`Ошибка поиска «${query}»:`, e?.message ?? e);
     }
 
     await sleep(PAUSE_BETWEEN_QUERIES);
   }
 
   await saveSeen();
-  return { findings, scanned, batch };
+  return { findings, scanned, batch: batch.map((b) => b.query) };
 }
