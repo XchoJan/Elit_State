@@ -90,7 +90,7 @@ export default function ContactsPage() {
             </RevealItem>
           </RevealStagger>
 
-          <Reveal delay={0.15} className="rounded-3xl border border-line bg-white p-8 shadow-sm">
+          <Reveal className="rounded-3xl border border-line bg-white p-8 shadow-sm">
             <h2 className="font-display text-2xl font-bold text-brand">
               Оставить заявку
             </h2>

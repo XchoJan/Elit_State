@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { CONTACT_PHONE, CONTACT_PHONE_HREF } from "@/lib/data";
 
@@ -53,11 +52,7 @@ export default function Header() {
             >
               {item.label}
               {pathname === item.href && (
-                <motion.span
-                  layoutId="nav-underline"
-                  className="absolute -bottom-1 left-0 right-0 h-0.5 rounded-full bg-accent"
-                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                />
+                <span className="absolute -bottom-1 left-0 right-0 h-0.5 rounded-full bg-accent" />
               )}
             </Link>
           ))}
@@ -70,79 +65,72 @@ export default function Header() {
           >
             {CONTACT_PHONE}
           </a>
+          {/* Ведём на квиз, а не на страницу контактов: там человек упирается
+              в пустую форму, здесь — в первый лёгкий вопрос. */}
           <Link
-            href="/contacts"
-            className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:scale-[1.04] hover:bg-brand-light active:scale-[0.97]"
+            href="/#podbor"
+            className="rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:scale-[1.04] hover:bg-accent-dark active:scale-[0.97]"
           >
-            Оставить заявку
+            Подобрать бесплатно
           </Link>
         </div>
 
         <button
           onClick={() => setOpen(!open)}
-          className="flex h-10 w-10 items-center justify-center rounded-lg text-brand md:hidden"
+          className="flex h-10 w-10 items-center justify-center rounded-lg md:hidden"
           aria-label="Меню"
+          aria-expanded={open}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <motion.line
-              x1="4"
-              x2="20"
-              initial={false}
-              animate={open ? { y1: 12, y2: 12, rotate: 45 } : { y1: 7, y2: 7, rotate: 0 }}
-              style={{ originX: "12px", originY: "12px" }}
-              transition={{ duration: 0.25 }}
+          <span className="relative block h-4 w-6">
+            <span
+              className={`absolute left-0 block h-0.5 w-6 rounded-full bg-brand transition-transform duration-300 ${
+                open ? "top-1/2 -translate-y-1/2 rotate-45" : "top-0"
+              }`}
             />
-            <motion.line
-              x1="4"
-              x2="20"
-              initial={false}
-              animate={{ y1: 12, y2: 12, opacity: open ? 0 : 1 }}
-              transition={{ duration: 0.15 }}
+            <span
+              className={`absolute left-0 top-1/2 block h-0.5 w-6 -translate-y-1/2 rounded-full bg-brand transition-opacity duration-200 ${
+                open ? "opacity-0" : "opacity-100"
+              }`}
             />
-            <motion.line
-              x1="4"
-              x2="20"
-              initial={false}
-              animate={open ? { y1: 12, y2: 12, rotate: -45 } : { y1: 17, y2: 17, rotate: 0 }}
-              style={{ originX: "12px", originY: "12px" }}
-              transition={{ duration: 0.25 }}
+            <span
+              className={`absolute left-0 block h-0.5 w-6 rounded-full bg-brand transition-transform duration-300 ${
+                open ? "top-1/2 -translate-y-1/2 -rotate-45" : "bottom-0"
+              }`}
             />
-          </svg>
+          </span>
         </button>
       </div>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.21, 0.47, 0.32, 0.98] }}
-            className="overflow-hidden border-t border-line bg-white md:hidden"
-          >
-            <div className="px-4 pb-6 pt-2">
-              {nav.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className={`block py-3 text-base font-medium ${
-                    pathname === item.href ? "text-accent" : "text-brand"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
-              <a
-                href={CONTACT_PHONE_HREF}
-                className="mt-2 block rounded-full bg-brand px-5 py-3 text-center text-sm font-semibold text-white"
+      {/* Раскрытие меню: сетка с 0fr → 1fr анимирует высоту без её измерения
+          в JS и без библиотеки анимаций. */}
+      <div
+        className={`grid overflow-hidden border-t bg-white transition-all duration-300 md:hidden ${
+          open ? "grid-rows-[1fr] border-line" : "grid-rows-[0fr] border-transparent"
+        }`}
+      >
+        <div className="min-h-0">
+          <div className="px-4 pb-5 pt-2">
+            {nav.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className={`block py-3 text-base font-medium ${
+                  pathname === item.href ? "text-accent" : "text-brand"
+                }`}
               >
-                {CONTACT_PHONE}
-              </a>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                {item.label}
+              </Link>
+            ))}
+            <a
+              href={CONTACT_PHONE_HREF}
+              className="mt-2 block rounded-full bg-brand px-5 py-3 text-center text-sm font-semibold text-white"
+            >
+              {CONTACT_PHONE}
+            </a>
+          </div>
+        </div>
+      </div>
     </header>
   );
 }

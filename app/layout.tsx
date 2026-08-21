@@ -3,7 +3,7 @@ import { Manrope, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import MotionProvider from "@/components/MotionProvider";
+import StickyCta from "@/components/StickyCta";
 import ScrollProgress from "@/components/ScrollProgress";
 import YandexMetrika from "@/components/YandexMetrika";
 import MetaPixel from "@/components/MetaPixel";
@@ -66,12 +66,11 @@ export default function RootLayout({
       <body className="flex min-h-full flex-col">
         <JsonLd data={organizationJsonLd()} />
         <Attribution />
-        <MotionProvider>
-          <ScrollProgress />
-          <Header />
-          {children}
-          <Footer />
-        </MotionProvider>
+        <ScrollProgress />
+        <Header />
+        {children}
+        <Footer />
+        <StickyCta />
         <YandexMetrika />
         <MetaPixel />
       </body>

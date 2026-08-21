@@ -1,9 +1,9 @@
 "use client";
 
-import { motion } from "motion/react";
 import { useState } from "react";
 import { GOALS, reachGoal } from "@/lib/analytics";
 import { getAttribution } from "@/lib/attribution";
+import { CONTACT_PHONE, WHATSAPP_HREF } from "@/lib/data";
 
 export default function LeadForm({
   subject,
@@ -40,22 +40,17 @@ export default function LeadForm({
 
   if (status === "done") {
     return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.35, ease: [0.21, 0.47, 0.32, 0.98] }}
-        className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center"
-      >
+      <div className="anim-up rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
         <p className="text-lg font-semibold text-emerald-800">Заявка отправлена!</p>
         <p className="mt-1 text-sm text-emerald-700">
           Наш менеджер свяжется с вами в ближайшее время.
         </p>
-      </motion.div>
+      </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className={compact ? "space-y-3" : "space-y-4"}>
+    <form onSubmit={handleSubmit} className={compact ? "space-y-3" : "space-y-3.5"}>
       {/* Ловушка для спам-ботов: человек это поле не видит и не заполняет. */}
       <input
         name="company"
@@ -68,15 +63,18 @@ export default function LeadForm({
       <input
         name="name"
         required
+        autoComplete="name"
         placeholder="Ваше имя"
-        className="w-full rounded-xl border border-line bg-white px-4 py-3 text-sm outline-none transition-colors placeholder:text-muted focus:border-accent"
+        className="w-full rounded-xl border border-line bg-white px-4 py-3.5 text-sm outline-none transition-colors placeholder:text-muted focus:border-accent"
       />
       <input
         name="phone"
         required
         type="tel"
-        placeholder="Телефон или WhatsApp"
-        className="w-full rounded-xl border border-line bg-white px-4 py-3 text-sm outline-none transition-colors placeholder:text-muted focus:border-accent"
+        autoComplete="tel"
+        inputMode="tel"
+        placeholder="Телефон или ник в Telegram"
+        className="w-full rounded-xl border border-line bg-white px-4 py-3.5 text-sm outline-none transition-colors placeholder:text-muted focus:border-accent"
       />
       {!compact && (
         <textarea
@@ -86,20 +84,26 @@ export default function LeadForm({
           className="w-full resize-none rounded-xl border border-line bg-white px-4 py-3 text-sm outline-none transition-colors placeholder:text-muted focus:border-accent"
         />
       )}
-      <motion.button
+      <button
         type="submit"
         disabled={status === "sending"}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        className="w-full rounded-xl bg-accent px-6 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-accent-dark disabled:opacity-60"
+        className="w-full rounded-xl bg-accent px-6 py-4 text-sm font-bold text-white transition-all duration-150 hover:scale-[1.01] hover:bg-accent-dark active:scale-[0.99] disabled:opacity-60"
       >
         {status === "sending" ? "Отправляем…" : "Получить подборку объектов"}
-      </motion.button>
+      </button>
       {status === "error" && (
         <p className="text-center text-sm text-red-600">
-          Не удалось отправить. Позвоните нам: +374 91 446615
+          Не удалось отправить. Позвоните нам: {CONTACT_PHONE}
         </p>
       )}
+      <a
+        href={WHATSAPP_HREF}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block rounded-xl border-2 border-whatsapp/40 py-3 text-center text-sm font-semibold text-[#128c4b] transition-colors hover:bg-whatsapp/10"
+      >
+        Или напишите нам в WhatsApp
+      </a>
       <p className="text-center text-xs text-muted">
         Нажимая кнопку, вы соглашаетесь с обработкой персональных данных
       </p>

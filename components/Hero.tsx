@@ -1,100 +1,114 @@
-"use client";
-
-import Image from "next/image";
 import Link from "next/link";
-import { motion, type Variants } from "motion/react";
-import { cities, CONTACT_PHONE, CONTACT_PHONE_HREF } from "@/lib/data";
+import Quiz from "@/components/Quiz";
+import {
+  cities,
+  CONTACT_PHONE,
+  CONTACT_PHONE_HREF,
+  HERO_PROOF,
+  WHATSAPP_HREF,
+} from "@/lib/data";
 
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=2000&q=80";
-
-const EASE: [number, number, number, number] = [0.21, 0.47, 0.32, 0.98];
-
-const container: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } },
-};
-
-const item: Variants = {
-  hidden: { opacity: 0, y: 24 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
-};
+// Первый экран сознательно собран без клиентского JS: разметка приходит с
+// сервера уже видимой, фон — заранее сжатый webp из public (а не «на лету»
+// через /_next/image). Единственный интерактивный кусок здесь — квиз.
 
 export default function Hero() {
   return (
-    <section className="relative overflow-hidden">
-      <div className="absolute inset-0">
-        <Image
-          src={HERO_IMAGE}
-          alt="Недвижимость мечты"
-          fill
-          preload
-          sizes="100vw"
-          className="animate-kenburns object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-brand/80 via-brand/60 to-brand/85" />
-        <div className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-accent/30 blur-3xl animate-float-a" />
-        <div className="pointer-events-none absolute -right-16 bottom-0 h-80 w-80 rounded-full bg-accent/20 blur-3xl animate-float-b" />
+    <section className="relative overflow-hidden bg-brand">
+      <img
+        src="/img/hero-1280.webp"
+        srcSet="/img/hero-768.webp 768w, /img/hero-1280.webp 1280w, /img/hero-1920.webp 1920w"
+        sizes="100vw"
+        alt=""
+        aria-hidden="true"
+        fetchPriority="high"
+        decoding="async"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      {/* Фото — это атмосфера, а не содержание: гасим его, чтобы текст и
+          карточка квиза читались даже на солнце с телефона. */}
+      <div className="absolute inset-0 bg-gradient-to-br from-brand-deep/95 via-brand/88 to-brand-light/72" />
+      <div className="pointer-events-none absolute -left-24 top-0 h-72 w-72 rounded-full bg-accent/25 blur-3xl animate-float-a" />
+
+      <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-14 lg:py-20">
+        <div className="grid gap-7 lg:grid-cols-12 lg:gap-12">
+          {/* Оффер */}
+          <div className="anim-up lg:col-span-6 lg:self-center">
+            <p className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3.5 py-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm">
+              Дубай · Ереван · Грузия · Россия
+            </p>
+            <h1 className="font-display mt-4 text-[1.85rem] font-bold leading-[1.14] text-white sm:mt-5 sm:text-5xl lg:text-[3.4rem]">
+              Подберём квартиру за рубежом —{" "}
+              <span className="text-accent">бесплатно для вас</span>
+            </h1>
+            <p className="mt-3.5 max-w-xl text-[0.95rem] leading-relaxed text-white/80 sm:mt-4 sm:text-lg">
+              Комиссию нам платит застройщик — цена для вас та же, что в его
+              отделе продаж. Ответьте на 3 вопроса, и за сутки пришлём подборку
+              с ценами и планировками.
+              {/* На телефоне каждая строка отодвигает квиз ниже экрана,
+                  поэтому продолжение показываем только на широких. */}
+              <span className="hidden sm:inline">
+                {" "}
+                С честными комментариями по каждому варианту — включая те, что
+                нам самим не нравятся.
+              </span>
+            </p>
+          </div>
+
+          {/* Квиз. На телефоне он идёт сразу за заголовком — так первое
+              действие попадает на первый экран, а не через полторы прокрутки. */}
+          <div
+            id="podbor"
+            className="anim-up anim-d2 scroll-mt-20 lg:col-span-6 lg:row-span-2 lg:self-center"
+          >
+            <Quiz subject="Квиз с первого экрана" />
+          </div>
+
+          {/* Доказательства и связь */}
+          <div className="anim-up anim-d3 lg:col-span-6">
+            <ul className="grid gap-2.5 sm:grid-cols-3 lg:gap-3">
+              {HERO_PROOF.map((p) => (
+                <li
+                  key={p.title}
+                  className="rounded-2xl border border-white/15 bg-white/[0.07] px-4 py-3 backdrop-blur-sm"
+                >
+                  <p className="text-sm font-bold text-accent">{p.title}</p>
+                  <p className="mt-0.5 text-xs leading-snug text-white/70">{p.text}</p>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-5 flex flex-col gap-2.5 sm:flex-row sm:items-center">
+              <a
+                href={WHATSAPP_HREF}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full bg-whatsapp px-6 py-3 text-center text-sm font-semibold text-white transition-transform duration-150 hover:scale-[1.03] active:scale-[0.98]"
+              >
+                Спросить в WhatsApp
+              </a>
+              <a
+                href={CONTACT_PHONE_HREF}
+                className="rounded-full border border-white/30 px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-white/10"
+              >
+                {CONTACT_PHONE}
+              </a>
+            </div>
+
+            <nav className="mt-5 flex flex-wrap gap-2" aria-label="Направления">
+              {cities.map((c) => (
+                <Link
+                  key={c.slug}
+                  href={c.path}
+                  className="rounded-full border border-white/15 px-3.5 py-1.5 text-xs font-medium text-white/70 transition-colors hover:border-accent hover:text-white"
+                >
+                  {c.countryFlag} {c.name}
+                </Link>
+              ))}
+            </nav>
+          </div>
+        </div>
       </div>
-
-      <motion.div
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="relative mx-auto flex max-w-7xl flex-col items-center px-4 pb-24 pt-20 text-center sm:px-6 sm:pb-28 sm:pt-28"
-      >
-        <motion.p
-          variants={item}
-          className="rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-white backdrop-blur-sm"
-        >
-          Дубай · Ереван · Грузия · Россия
-        </motion.p>
-        <motion.h1
-          variants={item}
-          className="font-display mt-6 max-w-3xl text-4xl font-bold leading-tight text-white sm:text-5xl lg:text-6xl"
-        >
-          Найдём квартиру вашей мечты
-        </motion.h1>
-        <motion.p
-          variants={item}
-          className="mt-5 max-w-2xl text-base leading-relaxed text-white/85 sm:text-lg"
-        >
-          Не тратьте недели на поиск. Ответьте на 4 вопроса — и за 24 часа мы
-          пришлём персональную подборку квартир и домов от проверенных
-          застройщиков, под ваш бюджет и вкус.
-        </motion.p>
-        <motion.div variants={item} className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <a
-            href="#podbor"
-            className="rounded-full bg-accent px-8 py-3.5 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:scale-[1.04] hover:bg-accent-dark active:scale-[0.97]"
-          >
-            Подобрать за 1 минуту
-          </a>
-          <a
-            href={CONTACT_PHONE_HREF}
-            className="rounded-full border border-white/40 bg-white/10 px-8 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition-all duration-200 hover:scale-[1.04] hover:bg-white/20 active:scale-[0.97]"
-          >
-            {CONTACT_PHONE}
-          </a>
-        </motion.div>
-
-        <motion.div
-          variants={item}
-          className="mt-14 grid w-full max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4"
-        >
-          {cities.map((c) => (
-            <Link
-              key={c.slug}
-              href={c.path}
-              className="rounded-2xl border border-white/20 bg-white/10 px-4 py-4 text-white backdrop-blur-md transition-all duration-200 hover:scale-[1.04] hover:border-accent hover:bg-white/20"
-            >
-              <span className="text-2xl">{c.countryFlag}</span>
-              <p className="mt-1.5 text-sm font-semibold">{c.name}</p>
-              {c.country && <p className="text-xs text-white/70">{c.country}</p>}
-            </Link>
-          ))}
-        </motion.div>
-      </motion.div>
     </section>
   );
 }

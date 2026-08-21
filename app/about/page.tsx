@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import AnimatedNumber from "@/components/AnimatedNumber";
 import { Reveal, RevealItem, RevealStagger } from "@/components/Reveal";
 import { cities, CONTACT_PHONE, CONTACT_PHONE_HREF } from "@/lib/data";
 
@@ -58,7 +57,7 @@ export default function AboutPage() {
           {stats.map((s) => (
             <RevealItem key={s.label} className="text-center">
               <p className="font-display text-4xl font-bold text-accent">
-                <AnimatedNumber value={s.value} />
+                {s.value}
               </p>
               <p className="mt-2 text-sm text-muted">{s.label}</p>
             </RevealItem>
@@ -93,7 +92,7 @@ export default function AboutPage() {
               ))}
             </ul>
           </Reveal>
-          <Reveal delay={0.15} className="relative aspect-[3/4] overflow-hidden rounded-3xl">
+          <Reveal className="relative aspect-[3/4] overflow-hidden rounded-3xl">
             <Image
               src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1200&q=80"
               alt="Команда Elite Estate"

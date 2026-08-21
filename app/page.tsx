@@ -1,9 +1,8 @@
 import Link from "next/link";
 import Hero from "@/components/Hero";
-import Quiz from "@/components/Quiz";
+import BudgetExplorer from "@/components/BudgetExplorer";
 import FloorPlans from "@/components/FloorPlans";
 import LeadForm from "@/components/LeadForm";
-import AnimatedNumber from "@/components/AnimatedNumber";
 import { Reveal, RevealItem, RevealStagger } from "@/components/Reveal";
 import {
   cities,
@@ -13,51 +12,84 @@ import {
   WHATSAPP_HREF,
 } from "@/lib/data";
 
-const promises = [
-  { value: "4 страны", label: "Дубай, Ереван, Грузия и Россия — в одном окне" },
-  { value: "0%", label: "Комиссия для покупателя — цены как у застройщика" },
-  { value: "24 часа", label: "И персональная подборка объектов у вас в WhatsApp" },
-  { value: "Дистанционно", label: "Онлайн-показы и сделки без вылета" },
+// Первое, что человек читает после первого экрана, — не рассказ о нас, а
+// ответы на вопросы, из-за которых он закрывает вкладку. Порядок именно
+// такой: снять страх → показать пользу → и только потом «почему мы».
+const objections = [
+  {
+    q: "Сколько стоят ваши услуги?",
+    a: "Нисколько. Комиссию нам платит застройщик, а цена квартиры для вас остаётся ровно такой же, как при прямом обращении в его отдел продаж.",
+  },
+  {
+    q: "Мне начнут названивать?",
+    a: "Нет. В заявке вы сами выбираете, куда писать — WhatsApp, Telegram или всё-таки звонок. Общается живой менеджер, автообзвона и рассылок у нас нет.",
+  },
+  {
+    q: "А если я ещё только присматриваюсь?",
+    a: "Это нормально: между первым запросом и сделкой обычно проходят месяцы. Подборка ни к чему не обязывает — можно просто посмотреть цифры по рынку и вернуться позже.",
+  },
+  {
+    q: "Можно купить, не вылетая в страну?",
+    a: "Да. Показываем объекты по видеосвязи, бронируем, оформляем по доверенности или через электронную регистрацию. Личный визит обычно нужен только для банка и визы.",
+  },
+  {
+    q: "Что, если объект окажется неудачным?",
+    a: "Считаем доходность и потенциал роста цены до покупки, а не после. Если вариант плохой — прямо об этом скажем и предложим другой: нам важнее сделка, которой вы будете довольны.",
+  },
+  {
+    q: "Почему сразу четыре страны?",
+    a: "Потому что задача у всех разная: где-то важнее ВНЖ, где-то доходность, где-то бюджет входа. Мы сравниваем рынки между собой и честно говорим, где ваша задача решается лучше.",
+  },
 ];
 
 const advantages = [
   {
-    icon: "🏙️",
     title: "Доступ к базам застройщиков",
     text: "Работаем напрямую с отделами продаж: свежие остатки, старты продаж и закрытые скидки — то, чего нет в открытых каталогах.",
   },
   {
-    icon: "🎯",
     title: "Подбор под ваш вкус",
     text: "Не листайте сотни объявлений. Расскажите, что важно именно вам — пришлём только подходящие варианты с фото и планировками.",
   },
   {
-    icon: "📄",
     title: "Сделка под ключ",
     text: "Проверка объекта и документов, договор, переводы, регистрация права собственности — берём всю рутину на себя.",
   },
   {
-    icon: "📈",
     title: "Инвестиционный подход",
     text: "Считаем доходность аренды и потенциал роста цены до покупки, а не после. Отговорим от плохого варианта.",
   },
   {
-    icon: "✈️",
     title: "Дистанционные сделки",
     text: "Покупка без вылета: онлайн-показы по видеосвязи, доверенность, электронная регистрация.",
   },
   {
-    icon: "🔑",
     title: "Сервис после покупки",
     text: "Ремонт, меблировка, сдача в аренду и управление недвижимостью — остаёмся на связи и после сделки.",
   },
 ];
 
 const steps = [
-  { n: "01", title: "Заявка", text: "Пройдите подбор за 1 минуту или напишите в WhatsApp — обсудим бюджет и цели покупки." },
-  { n: "02", title: "Подборка", text: "За 24 часа пришлём персональную подборку с ценами, фото и планировками." },
-  { n: "03", title: "Показ", text: "Организуем показ — лично или онлайн по видеосвязи из любой точки мира." },
-  { n: "04", title: "Сделка", text: "Проверим документы, проведём сделку и передадим вам ключи. Поздравляем!" },
+  {
+    n: "01",
+    title: "Заявка",
+    text: "Три вопроса в форме выше или сообщение в WhatsApp — обсудим бюджет и цели покупки.",
+  },
+  {
+    n: "02",
+    title: "Подборка",
+    text: "За 24 часа пришлём персональную подборку с ценами, фото и планировками.",
+  },
+  {
+    n: "03",
+    title: "Показ",
+    text: "Организуем показ — лично или онлайн по видеосвязи из любой точки мира.",
+  },
+  {
+    n: "04",
+    title: "Сделка",
+    text: "Проверим документы, проведём сделку и передадим вам ключи. Поздравляем!",
+  },
 ];
 
 export default function Home() {
@@ -65,59 +97,51 @@ export default function Home() {
     <main className="flex-1">
       <Hero />
 
-      {/* Promises strip */}
-      <section className="border-b border-line bg-white">
-        <RevealStagger className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
-          {promises.map((p) => (
-            <RevealItem key={p.value}>
-              <p className="text-2xl font-bold text-brand">
-                <AnimatedNumber value={p.value} />
-              </p>
-              <p className="mt-1 text-sm leading-relaxed text-muted">{p.label}</p>
-            </RevealItem>
-          ))}
-        </RevealStagger>
-      </section>
-
-      {/* Quiz */}
-      <section id="podbor" className="mx-auto max-w-7xl scroll-mt-20 px-4 py-16 sm:px-6 sm:py-20">
-        <div className="grid items-start gap-10 lg:grid-cols-5">
-          <Reveal className="lg:col-span-2">
+      {/* Возражения — сразу после первого экрана */}
+      <section className="border-b border-line bg-white py-14 sm:py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <Reveal className="max-w-2xl">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-              Бесплатный подбор
+              Без мелкого шрифта
             </p>
             <h2 className="font-display mt-2 text-3xl font-bold text-brand sm:text-4xl">
-              Ответьте на 4 вопроса — остальное сделаем мы
+              Шесть вопросов, которые вы бы задали первыми
             </h2>
-            <p className="mt-4 leading-relaxed text-muted">
-              У каждого «дома мечты» свой рецепт: кому-то — вид на море и терраса,
-              кому-то — доходность и рассрочка. Вместо каталога из тысячи чужих
-              объявлений мы собираем подборку под вас: только свежие предложения
-              застройщиков, актуальные цены и честные комментарии по каждому
-              варианту.
-            </p>
-            <ul className="mt-6 space-y-3">
-              {[
-                "Подборка бесплатна и ни к чему не обязывает",
-                "Только реальные объекты в продаже — без «заманух»",
-                "Пришлём в WhatsApp: фото, планировки, цены",
-              ].map((t) => (
-                <li key={t} className="flex items-start gap-2.5 text-sm text-foreground/80">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs text-accent-dark">
-                    ✓
-                  </span>
-                  {t}
-                </li>
-              ))}
-            </ul>
           </Reveal>
-          <Reveal delay={0.15} className="lg:col-span-3">
-            <Quiz />
+          <RevealStagger className="mt-9 grid gap-x-10 gap-y-7 md:grid-cols-2 lg:grid-cols-3">
+            {objections.map((o) => (
+              <RevealItem key={o.q}>
+                <h3 className="text-base font-bold text-brand">{o.q}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{o.a}</p>
+              </RevealItem>
+            ))}
+          </RevealStagger>
+        </div>
+      </section>
+
+      {/* Калькулятор бюджета */}
+      <section id="budget" className="scroll-mt-20 py-16 sm:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <Reveal className="mx-auto max-w-2xl text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+              Сравнение рынков
+            </p>
+            <h2 className="font-display mt-2 text-3xl font-bold text-brand sm:text-4xl">
+              Что ваши деньги дают в каждой стране
+            </h2>
+            <p className="mt-3 leading-relaxed text-muted">
+              Одна и та же сумма — это студия в Дубае, двушка в центре Еревана
+              или дом под Батуми. Посмотрите сами, прежде чем говорить с
+              менеджером.
+            </p>
+          </Reveal>
+          <Reveal className="mt-9">
+            <BudgetExplorer />
           </Reveal>
         </div>
       </section>
 
-      {/* Cities infographic */}
+      {/* Направления */}
       <section id="cities" className="scroll-mt-20 bg-white py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <Reveal className="text-center">
@@ -128,8 +152,8 @@ export default function Home() {
               Четыре рынка — четыре разные стратегии
             </h2>
             <p className="mx-auto mt-3 max-w-2xl text-muted">
-              Сравните города и решите, что ближе вам — а мы подскажем, где ваша
-              задача решается лучше всего.
+              Сравните направления и решите, что ближе вам — а мы подскажем, где
+              ваша задача решается лучше всего.
             </p>
           </Reveal>
 
@@ -137,23 +161,29 @@ export default function Home() {
             {cities.map((c) => (
               <RevealItem
                 key={c.slug}
-                className="flex flex-col rounded-3xl border border-line bg-card p-7 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+                className="flex h-full flex-col rounded-3xl border border-line bg-card p-7 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-accent/50 hover:shadow-lg"
               >
                 <div className="flex items-center gap-3">
                   <span className="text-3xl">{c.countryFlag}</span>
                   <div>
-                    <h3 className="font-display text-2xl font-bold text-brand">{c.name}</h3>
+                    <h3 className="font-display text-2xl font-bold text-brand">
+                      {c.name}
+                    </h3>
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted">
                       {c.country ? `${c.country} · ${c.tagline}` : c.tagline}
                     </p>
                   </div>
                 </div>
-                <p className="mt-4 text-sm leading-relaxed text-muted">{c.description}</p>
+                <p className="mt-4 text-sm leading-relaxed text-muted">
+                  {c.description}
+                </p>
 
                 <div className="mt-6 grid grid-cols-3 gap-4 border-t border-line pt-5">
                   {c.stats.map((s) => (
                     <div key={s.label}>
-                      <p className="text-lg font-bold leading-tight text-brand">{s.value}</p>
+                      <p className="text-lg font-bold leading-tight text-brand">
+                        {s.value}
+                      </p>
                       <p className="mt-1 text-xs leading-snug text-muted">{s.label}</p>
                     </div>
                   ))}
@@ -164,12 +194,20 @@ export default function Home() {
                   <p className="text-sm font-medium text-accent-dark">{c.highlight}</p>
                 </div>
 
-                <Link
-                  href={c.path}
-                  className="mt-5 inline-block text-sm font-semibold text-accent transition-colors hover:text-accent-dark"
-                >
-                  Подробнее о недвижимости {c.nameIn} →
-                </Link>
+                <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-2 pt-5">
+                  <a
+                    href="#podbor"
+                    className="rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-dark"
+                  >
+                    Подобрать {c.nameIn}
+                  </a>
+                  <Link
+                    href={c.path}
+                    className="text-sm font-semibold text-brand transition-colors hover:text-accent"
+                  >
+                    Подробнее о рынке →
+                  </Link>
+                </div>
               </RevealItem>
             ))}
           </RevealStagger>
@@ -180,7 +218,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Floor plans */}
+      {/* Планировки */}
       <section id="planirovki" className="scroll-mt-20 py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <Reveal className="text-center">
@@ -196,11 +234,11 @@ export default function Home() {
             </p>
           </Reveal>
 
-          <Reveal delay={0.12} className="mt-10">
+          <Reveal className="mt-10">
             <FloorPlans />
           </Reveal>
 
-          <Reveal delay={0.2} className="mt-10 text-center">
+          <Reveal className="mt-10 text-center">
             <p className="mx-auto max-w-2xl text-xs leading-relaxed text-muted">
               Схемы типовые и приведены для наглядности — это не конкретные
               объекты в продаже. Планировки реальных квартир пришлём в подборке.
@@ -215,31 +253,30 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Advantages */}
+      {/* Преимущества */}
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
         <Reveal className="text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
             Почему Elite Estate
           </p>
           <h2 className="font-display mt-2 text-3xl font-bold text-brand sm:text-4xl">
-            Покупка недвижимости — это просто
+            Что мы берём на себя
           </h2>
         </Reveal>
         <RevealStagger className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {advantages.map((a) => (
             <RevealItem
               key={a.title}
-              className="rounded-2xl border border-line bg-card p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
+              className="h-full rounded-2xl border border-line bg-card p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
             >
-              <span className="text-3xl">{a.icon}</span>
-              <h3 className="mt-4 text-lg font-bold text-brand">{a.title}</h3>
+              <h3 className="text-lg font-bold text-brand">{a.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted">{a.text}</p>
             </RevealItem>
           ))}
         </RevealStagger>
       </section>
 
-      {/* Steps */}
+      {/* Как работаем */}
       <section className="bg-brand py-16 text-white sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <Reveal className="text-center">
@@ -252,17 +289,19 @@ export default function Home() {
           </Reveal>
           <RevealStagger className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {steps.map((s) => (
-              <RevealItem key={s.n} className="relative">
-                <span className="font-display text-5xl font-bold text-accent/40">{s.n}</span>
+              <RevealItem key={s.n}>
+                <span className="font-display text-5xl font-bold text-accent/40">
+                  {s.n}
+                </span>
                 <h3 className="mt-3 text-lg font-bold">{s.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-white/70">{s.text}</p>
               </RevealItem>
             ))}
           </RevealStagger>
-          <Reveal delay={0.2} className="mt-12 text-center">
+          <Reveal className="mt-12 text-center">
             <a
               href="#podbor"
-              className="inline-block rounded-full bg-accent px-8 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:scale-[1.04] hover:bg-accent-dark active:scale-[0.97]"
+              className="pulse-accent inline-block rounded-full bg-accent px-8 py-3.5 text-sm font-semibold text-white transition-all duration-200 hover:scale-[1.04] hover:bg-accent-dark active:scale-[0.97]"
             >
               Начать подбор
             </a>
@@ -270,32 +309,32 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA + Lead form */}
+      {/* Финальный контакт */}
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
         <Reveal className="grid items-center gap-10 rounded-3xl border border-line bg-white p-8 shadow-sm sm:p-12 lg:grid-cols-2">
           <div>
             <h2 className="font-display text-3xl font-bold text-brand sm:text-4xl">
-              Удобнее поговорить голосом?
+              Удобнее просто написать?
             </h2>
             <p className="mt-4 leading-relaxed text-muted">
-              Позвоните или напишите в WhatsApp — менеджер ответит на вопросы,
-              расскажет про города и пришлёт первые варианты уже в этом разговоре.
-              Или оставьте номер, и мы перезвоним сами.
+              Напишите в WhatsApp или позвоните — менеджер ответит на вопросы,
+              расскажет про направления и пришлёт первые варианты прямо в
+              переписке. Или оставьте контакт, и мы напишем сами.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <a
+                href={WHATSAPP_HREF}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full bg-whatsapp px-6 py-3 text-center text-sm font-semibold text-white transition-all duration-200 hover:scale-[1.03] hover:opacity-90 active:scale-[0.97]"
+              >
+                Написать в WhatsApp
+              </a>
               <a
                 href={CONTACT_PHONE_HREF}
                 className="rounded-full bg-brand px-6 py-3 text-center text-sm font-semibold text-white transition-all duration-200 hover:scale-[1.03] hover:bg-brand-light active:scale-[0.97]"
               >
                 {CONTACT_PHONE}
-              </a>
-              <a
-                href={WHATSAPP_HREF}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-full bg-[#25D366] px-6 py-3 text-center text-sm font-semibold text-white transition-all duration-200 hover:scale-[1.03] hover:opacity-90 active:scale-[0.97]"
-              >
-                Написать в WhatsApp
               </a>
             </div>
           </div>

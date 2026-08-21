@@ -1,64 +1,41 @@
-"use client";
-
-import { motion, type Variants } from "motion/react";
 import type { ReactNode } from "react";
 
-const EASE: [number, number, number, number] = [0.21, 0.47, 0.32, 0.98];
+// Появление блоков при прокрутке. Раньше это был клиентский компонент на
+// framer-motion, и до загрузки JS весь контент лежал с opacity:0 — страница
+// выглядела пустой. Теперь это обычная серверная разметка с CSS-классом:
+// разметка приходит видимой, а анимацию (если браузер умеет) навешивает
+// правило `.reveal` в globals.css.
 
 export function Reveal({
   children,
-  delay = 0,
-  y = 24,
   className,
   id,
 }: {
   children: ReactNode;
-  delay?: number;
-  y?: number;
   className?: string;
   /** Якорь для ссылок вида «#podbor». */
   id?: string;
 }) {
   return (
-    <motion.div
-      id={id}
-      className={className}
-      initial={{ opacity: 0, y }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.6, delay, ease: EASE }}
-    >
+    <div id={id} className={className ? `reveal ${className}` : "reveal"}>
       {children}
-    </motion.div>
+    </div>
   );
 }
 
 export function RevealStagger({
   children,
   className,
-  stagger = 0.08,
 }: {
   children: ReactNode;
   className?: string;
-  stagger?: number;
 }) {
   return (
-    <motion.div
-      className={className}
-      initial="hidden"
-      whileInView="show"
-      viewport={{ once: true, margin: "-80px" }}
-      variants={{ hidden: {}, show: { transition: { staggerChildren: stagger } } }}
-    >
+    <div className={className ? `reveal-stagger ${className}` : "reveal-stagger"}>
       {children}
-    </motion.div>
+    </div>
   );
 }
-
-const staggerChild: Variants = {
-  hidden: { opacity: 0, y: 24 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
-};
 
 export function RevealItem({
   children,
@@ -68,8 +45,6 @@ export function RevealItem({
   className?: string;
 }) {
   return (
-    <motion.div className={className} variants={staggerChild}>
-      {children}
-    </motion.div>
+    <div className={className ? `reveal ${className}` : "reveal"}>{children}</div>
   );
 }

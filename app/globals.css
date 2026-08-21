@@ -1,15 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #faf9f6;
-  --foreground: #1a2332;
-  --brand: #0f2438;
-  --brand-light: #1d3a56;
+  --background: #f7f6f3;
+  --foreground: #14202e;
+  --brand: #0b1c2e;
+  --brand-light: #17334f;
+  --brand-deep: #061320;
   --accent: #c9a24b;
   --accent-dark: #a8843a;
-  --muted: #6b7480;
+  --accent-soft: #f3e6c8;
+  --muted: #66707d;
   --card: #ffffff;
-  --line: #e8e4dc;
+  --line: #e7e3da;
+  --whatsapp: #25d366;
 }
 
 @theme inline {
@@ -17,11 +20,14 @@
   --color-foreground: var(--foreground);
   --color-brand: var(--brand);
   --color-brand-light: var(--brand-light);
+  --color-brand-deep: var(--brand-deep);
   --color-accent: var(--accent);
   --color-accent-dark: var(--accent-dark);
+  --color-accent-soft: var(--accent-soft);
   --color-muted: var(--muted);
   --color-card: var(--card);
   --color-line: var(--line);
+  --color-whatsapp: var(--whatsapp);
   --font-sans: var(--font-manrope);
   --font-display: var(--font-playfair);
 }
@@ -45,17 +51,67 @@ body {
   color: #fff;
 }
 
-@keyframes kenburns {
-  0% {
-    transform: scale(1);
+/* --------------------------------------------------------------------------
+   Появление контента.
+
+   Раньше это делал framer-motion: элементы приходили с сервера с opacity:0
+   и становились видимыми только после загрузки и гидратации ~260 КБ JS.
+   На медленном мобильном (а из рекламы приходят именно такие) человек
+   несколько секунд смотрел на пустой экран и уходил.
+
+   Теперь всё на CSS. Стили блокируют отрисовку, то есть работают всегда —
+   и там, где анимации не поддерживаются, контент просто сразу виден.
+   Худший сценарий здесь — «без анимации», а не «без контента».
+   -------------------------------------------------------------------------- */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
   }
-  100% {
-    transform: scale(1.09);
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
-.animate-kenburns {
-  animation: kenburns 20s ease-out forwards;
+/* Первый экран: анимация по времени, стартует сразу при отрисовке страницы. */
+.anim-up {
+  animation: fade-up 0.65s cubic-bezier(0.21, 0.47, 0.32, 0.98) both;
+}
+
+.anim-d1 {
+  animation-delay: 0.06s;
+}
+.anim-d2 {
+  animation-delay: 0.12s;
+}
+.anim-d3 {
+  animation-delay: 0.18s;
+}
+.anim-d4 {
+  animation-delay: 0.24s;
+}
+
+/* Блоки ниже по странице: появляются по мере прокрутки — но только там,
+   где браузер умеет привязывать анимацию к скроллу без JS. В остальных
+   (сейчас это Firefox) правило не применяется, и блок виден по умолчанию. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: fade-up linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 55%;
+    }
+
+    /* Лёгкая «лесенка» для сеток: соседние карточки догоняют друг друга. */
+    .reveal-stagger > *:nth-child(2n) {
+      animation-range: entry 4% entry 62%;
+    }
+    .reveal-stagger > *:nth-child(3n) {
+      animation-range: entry 8% entry 68%;
+    }
+  }
 }
 
 @keyframes float-a {
@@ -86,10 +142,45 @@ body {
   animation: float-b 18s ease-in-out infinite;
 }
 
+/* Мягкая пульсация вокруг главной кнопки — тянет взгляд к целевому действию. */
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgb(201 162 75 / 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 14px rgb(201 162 75 / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(201 162 75 / 0);
+  }
+}
+
+.pulse-accent {
+  animation: pulse-ring 2.4s ease-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-kenburns,
   .animate-float-a,
-  .animate-float-b {
+  .animate-float-b,
+  .pulse-accent,
+  .anim-up {
     animation: none !important;
+  }
+}
+
+/* Полоска прогресса чтения — целиком на CSS, без слушателей скролла. */
+@keyframes scroll-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@supports (animation-timeline: scroll()) {
+  .scroll-progress {
+    animation: scroll-progress linear;
+    animation-timeline: scroll();
   }
 }

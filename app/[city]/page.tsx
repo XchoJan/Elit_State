@@ -72,10 +72,20 @@ export default async function CityPage({
 
       {/* Первый экран */}
       <section className="relative overflow-hidden bg-brand text-white">
-        <div className="pointer-events-none absolute -left-24 top-0 h-72 w-72 rounded-full bg-accent/30 blur-3xl animate-float-a" />
-        <div className="pointer-events-none absolute -right-16 bottom-0 h-80 w-80 rounded-full bg-accent/20 blur-3xl animate-float-b" />
+        <img
+          src="/img/hero-1280.webp"
+          srcSet="/img/hero-768.webp 768w, /img/hero-1280.webp 1280w, /img/hero-1920.webp 1920w"
+          sizes="100vw"
+          alt=""
+          aria-hidden="true"
+          fetchPriority="high"
+          decoding="async"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-brand-deep/95 via-brand/88 to-brand-light/72" />
+        <div className="pointer-events-none absolute -left-24 top-0 h-72 w-72 rounded-full bg-accent/25 blur-3xl animate-float-a" />
 
-        <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
+        <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-14 lg:py-16">
           <nav aria-label="Хлебные крошки" className="text-sm text-white/60">
             <Link href="/" className="transition-colors hover:text-accent">
               Главная
@@ -84,20 +94,33 @@ export default async function CityPage({
             <span className="text-white/90">{city.name}</span>
           </nav>
 
-          <div className="mt-8 grid items-start gap-12 lg:grid-cols-2">
-            <Reveal>
-              <p className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] backdrop-blur-sm">
+          {/* Тот же порядок, что и на главной: на телефоне за заголовком
+              сразу идёт квиз, а цифры и кнопки — уже под ним. */}
+          <div className="mt-6 grid gap-7 lg:grid-cols-12 lg:gap-12">
+            <div className="anim-up lg:col-span-6 lg:self-center">
+              <p className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.18em] backdrop-blur-sm">
                 <span className="text-base">{city.countryFlag}</span>
                 {city.country || city.name}
               </p>
-              <h1 className="font-display mt-6 text-4xl font-bold leading-tight sm:text-5xl">
+              <h1 className="font-display mt-4 text-[1.85rem] font-bold leading-[1.14] sm:mt-5 sm:text-5xl">
                 {city.h1}
               </h1>
-              <p className="mt-5 text-base leading-relaxed text-white/85 sm:text-lg">
+              <p className="mt-3.5 text-[0.95rem] leading-relaxed text-white/80 sm:mt-4 sm:text-lg">
                 {city.lead}
               </p>
+            </div>
 
-              <div className="mt-8 grid grid-cols-3 gap-5 border-y border-white/15 py-6">
+            {/* Квиз сразу на первом экране: город уже известен из адреса,
+                поэтому человек начинает с вопроса о цели покупки. */}
+            <div
+              id="podbor"
+              className="anim-up anim-d2 scroll-mt-20 lg:col-span-6 lg:row-span-2 lg:self-center"
+            >
+              <Quiz city={city.slug} subject={`Квиз — ${city.name}`} />
+            </div>
+
+            <div className="anim-up anim-d3 lg:col-span-6">
+              <div className="grid grid-cols-3 gap-5 border-y border-white/15 py-5">
                 {city.stats.map((s) => (
                   <div key={s.label}>
                     <p className="text-xl font-bold leading-tight text-accent sm:text-2xl">
@@ -108,29 +131,23 @@ export default async function CityPage({
                 ))}
               </div>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <a
-                  href="#podbor"
-                  className="rounded-full bg-accent px-8 py-3.5 text-center text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:scale-[1.04] hover:bg-accent-dark active:scale-[0.97]"
-                >
-                  Получить подборку {city.nameIn}
-                </a>
+              <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
                 <a
                   href={WHATSAPP_HREF}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-full border border-white/40 bg-white/10 px-8 py-3.5 text-center text-sm font-semibold backdrop-blur-sm transition-all duration-200 hover:scale-[1.04] hover:bg-white/20 active:scale-[0.97]"
+                  className="rounded-full bg-whatsapp px-6 py-3 text-center text-sm font-semibold text-white transition-transform duration-150 hover:scale-[1.03] active:scale-[0.98]"
                 >
                   Спросить в WhatsApp
                 </a>
+                <a
+                  href={CONTACT_PHONE_HREF}
+                  className="rounded-full border border-white/30 px-6 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                >
+                  {CONTACT_PHONE}
+                </a>
               </div>
-            </Reveal>
-
-            {/* Квиз сразу на первом экране: город уже известен из адреса,
-                поэтому человек начинает с вопроса о цели покупки. */}
-            <Reveal delay={0.15} id="podbor" className="scroll-mt-20">
-              <Quiz city={city.slug} subject={`Квиз — ${city.name}`} />
-            </Reveal>
+            </div>
           </div>
         </div>
       </section>
@@ -162,7 +179,7 @@ export default async function CityPage({
             ))}
           </RevealStagger>
 
-          <Reveal delay={0.15} className="mt-8">
+          <Reveal className="mt-8">
             <div className="mx-auto flex max-w-3xl items-start gap-3 rounded-2xl bg-accent/10 px-6 py-5">
               <span className="text-lg">⭐</span>
               <p className="text-sm font-medium text-accent-dark">{city.highlight}</p>
