@@ -8,6 +8,7 @@ import "dotenv/config";
 import { AI_ENABLED, AI_MIN_SCORE, classify } from "./classifier.js";
 import { matchLead } from "./keywords.js";
 import { matchDevLead } from "./keywordsDev.js";
+import { matchWarmLead } from "./keywordsWarm.js";
 
 if (!AI_ENABLED) {
   console.error("Не задан ANTHROPIC_API_KEY в lead-radar/.env — проверять нечем.");
@@ -42,6 +43,16 @@ const DEV = [
   ["Подскажите, как лучше сделать авторизацию через API в Next.js?", "", false],
 ];
 
+const WARM = [
+  // должны пройти
+  ["Переезжаем с семьёй в Ереван в октябре, оформляем ВНЖ. Какие районы лучше для жизни с детьми?", "", true],
+  ["Открываю компанию в Дубае, планирую налоговое резидентство. Кто проходил, сколько занимает?", "", true],
+  ["Переехали в Батуми, ищем школу для ребёнка. Что посоветуете по районам?", "", true],
+  // не должны
+  ["Еду в Дубай на неделю в отпуск, что посмотреть и где поесть?", "", false],
+  ["Помогаем с ВНЖ в Армении и Грузии под ключ, обращайтесь в личку", "", false],
+];
+
 async function run(title, cases, matcher, profile) {
   console.log(`\n=== ${title} ===`);
   let ok = 0;
@@ -63,7 +74,12 @@ async function run(title, cases, matcher, profile) {
       console.log("     предфильтр не пропустил — до модели такое сообщение не дойдёт");
     }
     if (ai && reachesYou) {
-      const what = profile === "dev" ? ai.project_type : ai.location;
+      const what =
+        profile === "dev"
+          ? ai.project_type
+          : profile === "warm"
+            ? `${ai.country} · ${ai.stage} · жильё через ${ai.horizon}`
+            : ai.location;
       console.log(`     ${what} · ${ai.budget} ${ai.currency} · ${ai.timeframe}`);
       console.log(`     ${ai.reason}`);
     }
@@ -74,4 +90,5 @@ async function run(title, cases, matcher, profile) {
 
 const a = await run("Недвижимость", ESTATE, matchLead, "estate");
 const b = await run("Разработка", DEV, matchDevLead, "dev");
-process.exit(a && b ? 0 : 1);
+const c = await run("Тёплый контакт", WARM, matchWarmLead, "warm");
+process.exit(a && b && c ? 0 : 1);
