@@ -101,6 +101,24 @@ console.log(`Уже состоите в ${joined.size} чатах, ищу нов
 
 const found = new Map();
 
+/**
+ * Чат обсуждений, привязанный к каналу. Telegram отдаёт его только в полной
+ * карточке канала, поэтому за каждым приходится ходить отдельным запросом.
+ */
+async function linkedChat(channel) {
+  try {
+    const full = await client.invoke(
+      new Api.channels.GetFullChannel({ channel })
+    );
+    const linkedId = full.fullChat?.linkedChatId;
+    if (!linkedId) return null;
+    return (full.chats ?? []).find((c) => String(c.id) === String(linkedId)) ?? null;
+  } catch {
+    // У закрытых каналов полную карточку не отдают — это не повод падать.
+    return null;
+  }
+}
+
 for (const q of QUERIES) {
   try {
     const res = await client.invoke(
@@ -110,8 +128,24 @@ for (const q of QUERIES) {
     for (const chat of res.chats ?? []) {
       const id = String(chat.id);
       if (joined.has(id) || found.has(id)) continue;
-      // Каналы-вещалки не нужны: там не спрашивают, там только читают.
-      if (chat.broadcast) continue;
+
+      // Сам канал читать бесполезно — там вещают. Но у канала бывает
+      // связанный чат обсуждений, и вот он-то и нужен: там сидят читатели
+      // канала про новостройки и задают ровно те вопросы, которые мы ищем.
+      // Поиском Telegram такие чаты не находятся — только через сам канал.
+      if (chat.broadcast) {
+        const linked = await linkedChat(chat);
+        if (!linked) continue;
+        const linkedId = String(linked.id);
+        if (joined.has(linkedId) || found.has(linkedId)) continue;
+        found.set(linkedId, {
+          title: linked.title ?? `обсуждение «${chat.title ?? ""}»`,
+          username: linked.username,
+          members: linked.participantsCount ?? 0,
+          query: `${q} → обсуждение канала`,
+        });
+        continue;
+      }
 
       const members = chat.participantsCount ?? 0;
       if (members < MIN_PARTICIPANTS) continue;
@@ -172,7 +206,7 @@ async function probe(entity) {
 }
 
 const list = [];
-for (const c of candidates.slice(0, 25)) {
+for (const c of candidates.slice(0, 40)) {
   if (!c.username) continue; // закрытый чат не прочитать, не вступив
   try {
     const entity = await client.getEntity(c.username);
