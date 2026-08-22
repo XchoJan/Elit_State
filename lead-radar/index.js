@@ -254,6 +254,9 @@ client.addEventHandler(async (event) => {
 
     // Личные переписки пропускаем: там и так видно, что пишут.
     if (chat?.className === "User") return;
+    // Вещание канала — это объявление, а не разговор: отвечать там некому.
+    // Отсюда шли отчёты по рынку, реклама вилл и «авто в рассрочку».
+    if (chat?.broadcast) return;
     if (isOwnChat(chat)) return; // свои же уведомления не анализируем
     if (!isWatched(chat)) return;
 
@@ -272,7 +275,9 @@ client.addEventHandler(async (event) => {
     }
 
     const sender = await resolveSender(event, message);
-    if (sender?.bot) return;
+    // Бот или канал вместо человека: канал подписывает сообщения собой,
+    // когда его пост автоматически уезжает в связанный чат обсуждений.
+    if (sender?.bot || sender?.className === "Channel") return;
 
     // Помечаем в любом случае, даже отклонённое: иначе глобальный поиск
     // через полчаса найдёт то же сообщение и оплатит ещё один разбор.

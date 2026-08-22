@@ -83,7 +83,7 @@ async function saveSeen() {
 /** Название, ссылка и id чата по peerId сообщения — из справочника в ответе. */
 function describeChat(message, chats) {
   const channelId = message.peerId?.channelId ?? message.peerId?.chatId;
-  if (!channelId) return { title: "", link: null, id: "" };
+  if (!channelId) return { title: "", link: null, id: "", broadcast: false };
 
   const id = String(channelId);
   const chat = chats.find((c) => String(c.id) === id);
@@ -92,7 +92,8 @@ function describeChat(message, chats) {
     ? `https://t.me/${chat.username}/${message.id}`
     : `https://t.me/c/${id}/${message.id}`;
 
-  return { title, link, id };
+  // broadcast — канал, а не группа: там объявление, а не человек с запросом.
+  return { title, link, id, broadcast: Boolean(chat?.broadcast) };
 }
 
 /**
@@ -137,8 +138,9 @@ export async function runGlobalSearch(client, profiles) {
         const text = message.message;
         if (!text || message.out) continue;
 
-        const { title, link, id } = describeChat(message, chats);
+        const { title, link, id, broadcast } = describeChat(message, chats);
         if (isOwnChat(id)) continue; // свои же уведомления не ищем
+        if (broadcast) continue; // вещание канала — отвечать некому
 
         // Ключ по id чата, а не по названию: название определяется не всегда,
         // и одно и то же сообщение приходило по нескольку раз.

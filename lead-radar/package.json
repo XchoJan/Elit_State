@@ -10,7 +10,8 @@
     "backfill": "node backfill.js",
     "discover": "node discoverChats.js",
     "test-ai": "node test-classifier.js",
-    "test-words": "node test-keywords.js"
+    "test-words": "node test-keywords.js",
+    "test-real": "node test-real.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
