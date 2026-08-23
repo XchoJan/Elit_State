@@ -11,6 +11,8 @@
 // Запускать: npm run discover (радар лучше остановить: pm2 stop lead-radar)
 
 import "dotenv/config";
+import { writeFile } from "fs/promises";
+import path from "path";
 import { TelegramClient, Api } from "teleproto";
 import { StringSession } from "teleproto/sessions/index.js";
 
@@ -20,38 +22,82 @@ const session = process.env.TG_SESSION;
 const botToken = process.env.TELEGRAM_BOT_TOKEN;
 const chatId = process.env.TELEGRAM_CHAT_ID;
 
-/** Что ищем. Города и формулировки, по которым люди называют свои чаты. */
+/**
+ * Что ищем.
+ *
+ * Раньше здесь намеренно не было общегородских чатов вроде «Ереван чат»:
+ * они состоят из «где поесть» и «сниму за 500$». Это было верно, пока фильтр
+ * протекал на аренде. Теперь аренда отсекается словарями и порогом суммы,
+ * так что общие чаты релокантов снова имеют смысл: покупатель сидит именно
+ * там, просто говорит о покупке раз в неделю, а не каждым сообщением.
+ */
 const QUERIES = [
-  // Инвестиционные и покупательские чаты — там аудитория с деньгами.
-  // Общегородские чаты («Ереван чат») сюда намеренно не включены: там
-  // спрашивают, где поесть и как снять за 500$, а не где купить за 400к.
-  "инвестиции в недвижимость",
-  "недвижимость Дубай инвестиции",
-  "Dubai real estate",
+  // --- ОАЭ ---
+  "Дубай чат",
+  "русские в Дубае",
+  "ОАЭ чат",
   "Дубай инвестиции",
-  "купить недвижимость Дубай",
-  "недвижимость ОАЭ",
+  "недвижимость Дубай",
+  "новостройки Дубай",
   "золотая виза ОАЭ",
-  "недвижимость Грузия инвестиции",
+  "переезд в Дубай",
+  "релокация ОАЭ",
+  "бизнес в ОАЭ",
+  "налоги ОАЭ",
+  "Dubai chat",
+  "Dubai real estate",
+  "Dubai off plan",
+  "Emaar",
+  "DAMAC",
+  "Dubai Marina",
+  "Business Bay",
+
+  // --- Армения ---
+  "Ереван чат",
+  "русские в Армении",
+  "Армения релокация",
+  "Ереван недвижимость",
+  "ВНЖ Армения",
+  "переезд в Армению",
+  "бизнес в Армении",
+  "Ереван квартиры",
+  "Армения инвестиции",
+
+  // --- Грузия ---
+  "Тбилиси чат",
+  "Батуми чат",
+  "русские в Грузии",
+  "Грузия релокация",
+  "ВНЖ Грузия",
   "Батуми недвижимость",
-  "Тбилиси недвижимость купить",
-  "Ереван недвижимость купить",
-  "ВНЖ через недвижимость",
+  "Тбилиси недвижимость",
+  "Грузия инвестиции",
+  "переезд в Грузию",
+  "Батуми инвестиции",
+  "Батуми апартаменты",
+
+  // --- Россия ---
+  "новостройки Сочи",
+  "недвижимость Сочи",
+  "Краснодар новостройки",
+  "инвестиции в новостройки",
+  "новостройки Москва чат",
+
+  // --- Инвестиции и релокация вообще ---
   "зарубежная недвижимость",
+  "инвестиции в недвижимость",
+  "недвижимость за рубежом",
+  "второй паспорт",
   "релокация бизнеса",
   "налоговое резидентство",
-  // Прицельно под новостройки: покупатель на этапе строительства обсуждает
-  // конкретный проект и условия рассрочки, а не «недвижимость вообще».
-  "новостройки Дубай",
-  "новостройки Сочи",
-  "рассрочка недвижимость Дубай",
+  "куда инвестировать",
   "покупка квартиры за рубежом",
-  "инвестиции в новостройки",
-  "off plan Dubai",
+  "инвестиции в недвижимость чат",
+  "недвижимость обсуждение",
 ];
 
 /** Мелкие чаты не окупают шум: ниже этого порога не показываем. */
-const MIN_PARTICIPANTS = Number(process.env.DISCOVER_MIN_MEMBERS ?? 300);
+const MIN_PARTICIPANTS = Number(process.env.DISCOVER_MIN_MEMBERS ?? 150);
 
 /**
  * Сколько последних сообщений прочитать, чтобы понять, живой это чат или
@@ -111,6 +157,7 @@ async function linkedChat(channel) {
       new Api.channels.GetFullChannel({ channel })
     );
     const linkedId = full.fullChat?.linkedChatId;
+    await sleep(1200); // отдельный вызов API — не частим
     if (!linkedId) return null;
     return (full.chats ?? []).find((c) => String(c.id) === String(linkedId)) ?? null;
   } catch {
@@ -158,12 +205,16 @@ for (const q of QUERIES) {
       });
     }
   } catch (e) {
-    const wait = /FLOOD_WAIT_(\d+)/.exec(e?.message ?? "");
-    if (wait) {
-      console.warn(`FLOOD_WAIT ${wait[1]} сек — останавливаюсь`);
+    const wait = Number(/FLOOD_WAIT_(\d+)/.exec(e?.message ?? "")?.[1] ?? 0);
+    if (wait > 0 && wait <= 60) {
+      console.warn(`FLOOD_WAIT ${wait} сек на «${q}» — жду и иду дальше`);
+      await sleep((wait + 2) * 1000);
+    } else if (wait > 60) {
+      console.warn(`FLOOD_WAIT ${wait} сек — слишком долго, прекращаю поиск`);
       break;
+    } else {
+      console.error(`Ошибка поиска «${q}»:`, e?.message ?? e);
     }
-    console.error(`Ошибка поиска «${q}»:`, e?.message ?? e);
   }
 
   await sleep(3000);
@@ -206,7 +257,7 @@ async function probe(entity) {
 }
 
 const list = [];
-for (const c of candidates.slice(0, 40)) {
+for (const c of candidates.slice(0, 80)) {
   if (!c.username) continue; // закрытый чат не прочитать, не вступив
   try {
     const entity = await client.getEntity(c.username);
@@ -226,9 +277,12 @@ for (const c of candidates.slice(0, 40)) {
 
     if (alive) list.push({ ...c, ...stats });
   } catch (e) {
-    const wait = /FLOOD_WAIT_(\d+)/.exec(e?.message ?? "");
-    if (wait) {
-      console.warn(`FLOOD_WAIT ${wait[1]} сек — прекращаю проверку`);
+    const wait = Number(/FLOOD_WAIT_(\d+)/.exec(e?.message ?? "")?.[1] ?? 0);
+    if (wait > 0 && wait <= 60) {
+      console.warn(`FLOOD_WAIT ${wait} сек — жду и продолжаю проверку`);
+      await sleep((wait + 2) * 1000);
+    } else if (wait > 60) {
+      console.warn(`FLOOD_WAIT ${wait} сек — прекращаю проверку`);
       break;
     }
   }
@@ -239,6 +293,15 @@ for (const c of candidates.slice(0, 40)) {
 // где пишут пятеро, бесполезнее чата на 500, где спорят каждый день.
 list.sort((a, b) => b.uniqueSenders * b.perDay - a.uniqueSenders * a.perDay);
 console.log(`Живых чатов: ${list.length}`);
+
+// В Telegram список уходит порезанным на сообщения по 4096 символов,
+// а файл можно перечитать целиком и сравнить с прошлым заходом.
+await writeFile(
+  path.join(process.cwd(), "discovered-chats.json"),
+  JSON.stringify({ at: new Date().toISOString(), list }, null, 2),
+  "utf8"
+);
+console.log("Список сохранён в discovered-chats.json");
 
 if (!list.length) {
   await notify(

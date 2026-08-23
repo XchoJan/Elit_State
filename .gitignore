@@ -53,3 +53,4 @@ next-env.d.ts
 
 # скрипты деплоя (содержат credentials)
 /bash_scripts
+lead-radar/discovered-chats.json
