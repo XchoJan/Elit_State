@@ -121,8 +121,13 @@ const SERVICE_AD = [
 
 export const MIN_LENGTH = 30;
 
+// Списки GEO и STOP приходят из keywords.js и с недавних пор содержат не
+// только строки, но и регулярки (армянская латиница). Без этой проверки
+// они бы молча не срабатывали здесь.
 function findMatches(haystack, list) {
-  return list.filter((word) => haystack.includes(word));
+  return list
+    .filter((item) => (item.re ? item.re.test(haystack) : haystack.includes(item)))
+    .map((item) => item.label ?? item);
 }
 
 /**

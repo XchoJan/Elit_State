@@ -19,6 +19,27 @@ const ESTATE = [
   ["Ребят, ищу разработчика на телеграм-бота, бюджет 100к, ТЗ есть", "", false, "чужая тема"],
 ];
 
+/**
+ * Армянский. В ереванских чатах пишут и графикой, и латиницей, причём
+ * латиница здесь опаснее: язык агглютинативный, суффиксы липнут к корню
+ * («Erevan» → «Erevanum», «gnel» → «gnelu»), поэтому закрывающая граница
+ * слова в регулярке всё ломает. А без открывающей — «tun» ловит «fortune».
+ */
+const ARMENIAN = [
+  ["pntrum em bnakaran Erevanum, byuje 100000 dollar", "", true, "латиница: ищу квартиру, бюджет"],
+  ["Pntrum em broker Erevanum, uzum em gnel bnakaran", "", true, "латиница: ищу брокера, хочу купить"],
+  ["Uzum em gnel bnakaran Erevani kentronum, aparikov", "", true, "латиница: купить в центре в рассрочку"],
+  ["Փնտրում եմ բնակարան Երևանում, ուզում եմ գնել", "", true, "графика: ищу квартиру, хочу купить"],
+  ["Ուզում եմ գնել նորակառույց Երևանի կենտրոնում, բյուջեն 120000 դոլար", "", true, "графика: новостройка"],
+
+  ["Pntrum em bnakaran vardzov Erevanum, amsakan 300000 dram", "", false, "аренда латиницей"],
+  ["Փնտրում եմ բնակարան վարձով, ամսական 250.000 դրամ", "", false, "аренда графикой"],
+  ["Վաճառվում է բնակարան Երևանում, 85000 դոլար", "", false, "продавец"],
+  ["Ashxatanq em pntrum Erevanum, ashxatavardz 300000 dram", "", false, "ищет работу"],
+  ["I made a fortune tuning my login page in Georgia", "", false, "ловушка: tun/gin внутри английских слов"],
+  ["Our engine has a plugin for beginners in Batumi", "", false, "ловушка: gin внутри engine/plugin"],
+];
+
 const DEV = [
   ["Ребят, ищу разработчика на телеграм-бота для магазина, бюджет 100к, ТЗ есть", "", true, "прямой заказ"],
   ["Нужен сайт-лендинг для агентства, сроки две недели, сколько будет стоить?", "", true, "заказ с вопросом о цене"],
@@ -71,9 +92,10 @@ function run(title, cases, matcher) {
 }
 
 const a = run("Недвижимость", ESTATE, matchLead);
+const arm = run("Недвижимость: армянский", ARMENIAN, matchLead);
 const b = run("Разработка", DEV, matchDevLead);
 const c = run("Тёплый контакт", WARM, matchWarmLead);
 
-const ok = a && b && c;
+const ok = a && arm && b && c;
 console.log(ok ? "\nВсе случаи разобраны верно." : "\nЕсть расхождения — смотрите ❌ выше.");
 process.exit(ok ? 0 : 1);
