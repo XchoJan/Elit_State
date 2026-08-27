@@ -7,7 +7,6 @@
 import "dotenv/config";
 import { AI_ENABLED, AI_MIN_SCORE, classify } from "./classifier.js";
 import { matchLead } from "./keywords.js";
-import { matchDevLead } from "./keywordsDev.js";
 import { matchWarmLead } from "./keywordsWarm.js";
 
 if (!AI_ENABLED) {
@@ -28,19 +27,6 @@ const ESTATE = [
   ["Продам свою квартиру в Тбилиси, срочно, 85к", "", false],
   ["Цены на квартиры в Ереване сильно выросли за год", "", false],
   ["Ищу квартиру в Берлине, бюджет 400к евро", "", false],
-];
-
-const DEV = [
-  // должны пройти
-  ["Ребят, ищу разработчика на телеграм-бота для магазина, бюджет 100к, ТЗ есть", "", true],
-  ["Нужен сайт-лендинг для агентства, сроки две недели, сколько будет стоить?", "", true],
-  ["Ищем подрядчика на доработку CRM, нужна интеграция с 1С", "", true],
-  ["Всё в экселе, хотим личный кабинет для клиентов. Посоветуйте студию?", "", true],
-  // не должны
-  ["Ищу работу frontend разработчиком, React, 3 года опыта, портфолио в профиле", "", false],
-  ["Делаю сайты под ключ на Тильде, обращайтесь в лс, мой рейт 2000 руб/час", "", false],
-  ["Вакансия: Python-разработчик в штат, оформление по ТК РФ, оклад от 200 000", "", false],
-  ["Подскажите, как лучше сделать авторизацию через API в Next.js?", "", false],
 ];
 
 const WARM = [
@@ -75,11 +61,9 @@ async function run(title, cases, matcher, profile) {
     }
     if (ai && reachesYou) {
       const what =
-        profile === "dev"
-          ? ai.project_type
-          : profile === "warm"
-            ? `${ai.country} · ${ai.stage} · жильё через ${ai.horizon}`
-            : ai.location;
+        profile === "warm"
+          ? `${ai.country} · ${ai.stage} · жильё через ${ai.horizon}`
+          : ai.location;
       console.log(`     ${what} · ${ai.budget} ${ai.currency} · ${ai.timeframe}`);
       console.log(`     ${ai.reason}`);
     }
@@ -89,6 +73,5 @@ async function run(title, cases, matcher, profile) {
 }
 
 const a = await run("Недвижимость", ESTATE, matchLead, "estate");
-const b = await run("Разработка", DEV, matchDevLead, "dev");
 const c = await run("Тёплый контакт", WARM, matchWarmLead, "warm");
-process.exit(a && b && c ? 0 : 1);
+process.exit(a && c ? 0 : 1);

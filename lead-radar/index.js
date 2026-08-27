@@ -73,7 +73,7 @@ if (!botToken) {
 if (!PROFILES.length) {
   console.error(
     "Ни одной темы не настроено — некуда присылать находки.\n" +
-      "Задайте TELEGRAM_CHAT_ID (недвижимость) и/или TELEGRAM_CHAT_ID_DEV (разработка)."
+      "Задайте TELEGRAM_CHAT_ID — чат, куда радар присылает находки."
   );
   process.exit(1);
 }
