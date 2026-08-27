@@ -13,7 +13,7 @@
 // человек устраивается надолго и при деньгах: семья, бизнес, ВНЖ, счёт
 // в банке. Турист и тот, кто ищет работу, отсекаются жёстко.
 
-import { GEO, STOP, normalize } from "./keywords.js";
+import { GEO, STOP, looksLikeListing, normalize } from "./keywords.js";
 
 /** Переезд как факт, а не как мечта. */
 const RELOCATION = [
@@ -142,6 +142,9 @@ export function matchWarmLead(text, chatTitle = "") {
   if (findMatches(haystack, STOP).length) return null;
   if (findMatches(haystack, TRANSIENT).length) return null;
   if (findMatches(haystack, SERVICE_AD).length) return null;
+  // Свёрстанное объявление — это витрина, а не человек. Здесь так рекламируют
+  // пакеты услуг по релокации: «ВНЖ — от $X», «Счёт в банке — от $Y».
+  if (looksLikeListing(text)) return null;
 
   const geo = findMatches(haystack, GEO);
   const geoFromChat = findMatches(normalize(chatTitle), GEO);
