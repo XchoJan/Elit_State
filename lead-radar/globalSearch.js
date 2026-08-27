@@ -83,7 +83,7 @@ async function saveSeen() {
 /** Название, ссылка и id чата по peerId сообщения — из справочника в ответе. */
 function describeChat(message, chats) {
   const channelId = message.peerId?.channelId ?? message.peerId?.chatId;
-  if (!channelId) return { title: "", link: null, id: "", broadcast: false };
+  if (!channelId) return { title: "", link: null, id: "", username: "", broadcast: false };
 
   const id = String(channelId);
   const chat = chats.find((c) => String(c.id) === id);
@@ -93,7 +93,7 @@ function describeChat(message, chats) {
     : `https://t.me/c/${id}/${message.id}`;
 
   // broadcast — канал, а не группа: там объявление, а не человек с запросом.
-  return { title, link, id, broadcast: Boolean(chat?.broadcast) };
+  return { title, link, id, username: chat?.username ?? "", broadcast: Boolean(chat?.broadcast) };
 }
 
 /**
@@ -138,7 +138,7 @@ export async function runGlobalSearch(client, profiles) {
         const text = message.message;
         if (!text || message.out) continue;
 
-        const { title, link, id, broadcast } = describeChat(message, chats);
+        const { title, link, id, username, broadcast } = describeChat(message, chats);
         if (isOwnChat(id)) continue; // свои же уведомления не ищем
         if (broadcast) continue; // вещание канала — отвечать некому
 
@@ -150,7 +150,7 @@ export async function runGlobalSearch(client, profiles) {
 
         scanned++;
         const match = profile.match(text, title);
-        if (match) findings.push({ text, title, link, match, query, profile });
+        if (match) findings.push({ text, title, link, id, username, match, query, profile });
       }
     } catch (e) {
       const wait = /FLOOD_WAIT_(\d+)/.exec(e?.message ?? "");

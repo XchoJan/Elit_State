@@ -51,6 +51,9 @@ next-env.d.ts
 # список уже показанных находок глобального поиска — рабочий файл радара
 /lead-radar/seen-global.json
 
+# счётчики по чатам и ваши оценки находок — накапливаются на сервере
+/lead-radar/chat-stats.json
+
 # скрипты деплоя (содержат credentials)
 /bash_scripts
 lead-radar/discovered-chats.json

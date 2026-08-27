@@ -24,6 +24,17 @@ import { NewMessage } from "teleproto/events/index.js";
 import { PROFILES, DISABLED_PROFILES, isOwnChat } from "./profiles.js";
 import { loadSeen, markSeen, runGlobalSearch, buildQueue } from "./globalSearch.js";
 import { AI_ENABLED, AI_MIN_SCORE, classify, formatCard, temperatureBadge } from "./classifier.js";
+import {
+  loadChatStats,
+  saveChatStats,
+  recordSeen,
+  recordMatch,
+  recordSent,
+  buildReport,
+  resetPeriod,
+  chatKey,
+} from "./chatStats.js";
+import { feedbackKeyboard, startFeedbackLoop } from "./feedback.js";
 
 const apiId = Number(process.env.TG_API_ID);
 const apiHash = process.env.TG_API_HASH;
@@ -105,7 +116,7 @@ function escapeHtml(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-async function sendTo(chatId, text, attempt = 0) {
+async function sendTo(chatId, text, extra = {}, attempt = 0) {
   const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -114,6 +125,7 @@ async function sendTo(chatId, text, attempt = 0) {
       text,
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
+      ...extra,
     }),
   });
   if (res.ok) return;
@@ -124,14 +136,14 @@ async function sendTo(chatId, text, attempt = 0) {
   const retryAfter = /"retry_after":(\d+)/.exec(body)?.[1];
   if (retryAfter && attempt < 3) {
     await new Promise((r) => setTimeout(r, (Number(retryAfter) + 1) * 1000));
-    return sendTo(chatId, text, attempt + 1);
+    return sendTo(chatId, text, extra, attempt + 1);
   }
   console.error(`Telegram API (чат ${chatId}):`, body);
 }
 
 /** Находка уходит только в чаты своей темы. */
-async function notify(profile, text) {
-  await Promise.all(profile.chatIds.map((id) => sendTo(id, text)));
+async function notify(profile, text, extra = {}) {
+  await Promise.all(profile.chatIds.map((id) => sendTo(id, text, extra)));
 }
 
 /** Служебные сообщения (запуск, «радар ослеп») касаются всех тем. */
@@ -186,6 +198,10 @@ function isWatched(chat) {
 const client = new TelegramClient(new StringSession(session), apiId, apiHash, {
   connectionRetries: 10,
 });
+
+// Счётчики по чатам поднимаем до подключения: обработчик сообщений начнёт
+// писать в них сразу, а перезапуск радара не должен обнулять неделю наблюдений.
+await loadChatStats();
 
 /**
  * Финальное решение по находке: показывать её или нет.
@@ -261,6 +277,9 @@ client.addEventHandler(async (event) => {
     if (!isWatched(chat)) return;
 
     stats.seen++;
+    // Ключ чата нужен и для статистики, и для кнопок оценки: по нему потом
+    // видно, из какого чата пришла находка, которую вы отметили живой.
+    const key = recordSeen(chat);
 
     // Сообщение может подойти сразу двум темам («нужен сайт для агентства
     // недвижимости») — тогда оно уйдёт в оба чата, каждый со своим разбором.
@@ -272,6 +291,7 @@ client.addEventHandler(async (event) => {
 
     for (const { profile } of hits) {
       matchedByProfile.set(profile.id, (matchedByProfile.get(profile.id) ?? 0) + 1);
+      recordMatch(key, profile.id);
     }
 
     const sender = await resolveSender(event, message);
@@ -308,8 +328,10 @@ client.addEventHandler(async (event) => {
           link ? `\n<a href="${link}">Открыть сообщение</a>` : "",
         ]
           .filter(Boolean)
-          .join("\n")
+          .join("\n"),
+        { reply_markup: feedbackKeyboard(profile.id, key) }
       );
+      recordSent(key, profile.id, { title: chatTitle, username: chat?.username });
 
       console.log(
         `[${new Date().toLocaleTimeString()}] ${profile.label}: находка в ` +
@@ -388,6 +410,58 @@ setInterval(async () => {
   for (const p of PROFILES) matchedByProfile.set(p.id, 0);
 }, STATS_INTERVAL_MIN * 60_000);
 
+// --- Сводка по чатам раз в сутки ---
+//
+// То, ради чего вообще заведён учёт по чатам: увидеть, какие из них приносят
+// людей, а какие просто шумят. Сводка уходит в канал своей темы и содержит
+// цифры только по ней — смешивать недвижимость и разработку в одном отчёте
+// нельзя по той же причине, по которой у них разные каналы.
+//
+// Час указывается по UTC, потому что в нём живёт сервер. В Ереване и Дубае
+// прибавьте 4: REPORT_HOUR=6 — это 10 утра по-местному.
+const REPORT_HOUR = Number(process.env.REPORT_HOUR ?? 6);
+
+// Если радар подняли уже после часа сводки, считаем её сегодняшней и не шлём.
+// Иначе каждый перезапуск в течение этого часа присылал бы отчёт заново —
+// а pm2 перезапускает процесс чаще, чем хотелось бы.
+const startedAt = new Date();
+let lastReportDay =
+  startedAt.getUTCHours() >= REPORT_HOUR ? startedAt.toISOString().slice(0, 10) : null;
+
+async function dailyReportTick() {
+  const now = new Date();
+  const day = now.toISOString().slice(0, 10);
+  if (now.getUTCHours() !== REPORT_HOUR || lastReportDay === day) return;
+  lastReportDay = day;
+
+  for (const profile of PROFILES) {
+    const lines = buildReport(profile.id, profile.label);
+    // null значит «за сутки не было ни одного сообщения»: присылать пустую
+    // таблицу незачем, а вот тишину заметит отдельная тревога выше.
+    if (!lines) continue;
+    await notify(profile, lines.join("\n"));
+  }
+
+  resetPeriod();
+  await saveChatStats(true);
+}
+
+setInterval(dailyReportTick, 10 * 60_000);
+
+// Счётчики пишутся на каждое сообщение, а на диск сбрасываются по таймеру:
+// пять тысяч записей в файл за сутки ради данных, которые нужны раз в день,
+// — лишняя работа для диска.
+setInterval(() => saveChatStats(), 5 * 60_000);
+
+// pm2 перезапускает процесс сигналом. Без этого обработчика терялось бы всё,
+// что накопилось с последнего сброса, — до пяти минут наблюдений.
+for (const signal of ["SIGTERM", "SIGINT"]) {
+  process.once(signal, async () => {
+    await saveChatStats(true);
+    process.exit(0);
+  });
+}
+
 // --- Глобальный поиск по публичным чатам ---
 // Слушатель выше работает только по чатам, куда вы вступили. Этот цикл ищет
 // по всей публичной части Telegram, поэтому находит людей в чатах, о которых
@@ -419,6 +493,10 @@ async function globalSearchTick() {
         continue;
       }
       const preview = f.text.length > 700 ? `${f.text.slice(0, 700)}…` : f.text;
+      // Чат из поиска в статистике равноправен с тем, где мы состоим: так
+      // видно, стоит ли вообще вступать в найденный чат.
+      const foundKey = chatKey(f.id);
+      recordMatch(foundKey, f.profile.id);
       await notify(
         f.profile,
         [
@@ -432,8 +510,10 @@ async function globalSearchTick() {
           f.link ? `\n<a href="${f.link}">Открыть сообщение</a>` : "",
         ]
           .filter(Boolean)
-          .join("\n")
+          .join("\n"),
+        { reply_markup: feedbackKeyboard(f.profile.id, foundKey) }
       );
+      recordSent(foundKey, f.profile.id, { title: f.title, username: f.username });
     }
   } catch (e) {
     console.error("Ошибка глобального поиска:", e?.message ?? e);
@@ -460,3 +540,7 @@ for (const profile of PROFILES) {
     `🟢 Lead radar запущен. Тема: <b>${profile.label}</b>. Слушает ${chatCount} чатов.`
   );
 }
+
+// Без await: это бесконечный цикл длинного опроса, и держать на нём запуск
+// радара нельзя. Свои ошибки он гасит сам и продолжает работать.
+startFeedbackLoop(botToken);
